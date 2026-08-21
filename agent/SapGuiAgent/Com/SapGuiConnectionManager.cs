@@ -19,15 +19,15 @@ public sealed class SapGuiConnectionManager
         _systemAllowlist = systemAllowlist.ToList();
     }
 
-    private static dynamic GetScriptingEngine()
+    private static ComHandle GetScriptingEngine()
     {
         // VERIFY-ON-TARGET: requires SAP Logon already running with a matching
         // `SAPGUI` moniker registered; scripting must be enabled client- and server-side.
         // Marshal.GetActiveObject isn't available on .NET Core/5+ (it wraps a Win32 API
         // that was never ported); Marshal.BindToMoniker is the supported equivalent for
         // reaching a running object by its registered moniker name.
-        dynamic sapGuiAuto = Marshal.BindToMoniker("SAPGUI");
-        return sapGuiAuto.GetScriptingEngine();
+        var sapGuiAuto = new ComHandle(Marshal.BindToMoniker("SAPGUI"));
+        return sapGuiAuto.CallCom("GetScriptingEngine");
     }
 
     private bool IsAllowed(string? systemNameOrDescription)
@@ -43,22 +43,17 @@ public sealed class SapGuiConnectionManager
         return Task.Run(() =>
         {
             var result = new ConnectionList();
-            dynamic engine = GetScriptingEngine();
-            dynamic connections = engine.Connections; // VERIFY-ON-TARGET: GuiApplication.Connections
-            int count = (int)connections.Count;
-            for (var i = 0; i < count; i++)
+            var engine = GetScriptingEngine();
+            foreach (var connection in engine.Collection("Connections")) // VERIFY-ON-TARGET: GuiApplication.Connections
             {
-                dynamic connection = connections.ElementAt(i);
                 var info = new ConnectionInfo
                 {
-                    ConnectionId = SapGuiComComponent.TryGet(() => (string)connection.Id, i.ToString()),
-                    Description = SapGuiComComponent.TryGet(() => (string)connection.Description, ""),
+                    ConnectionId = ComHandle.TryGet(() => connection.GetString("Id"), ""),
+                    Description = ComHandle.TryGet(() => connection.GetString("Description"), ""),
                 };
-                int sessionCount = SapGuiComComponent.TryGet(() => (int)connection.Children.Count, 0);
-                for (var s = 0; s < sessionCount; s++)
+                foreach (var session in ComHandle.TryGet(() => connection.Collection("Children"), Enumerable.Empty<ComHandle>()))
                 {
-                    info.SessionIds.Add(SapGuiComComponent.TryGet(
-                        () => (string)connection.Children.ElementAt(s).Id, s.ToString()));
+                    info.SessionIds.Add(ComHandle.TryGet(() => session.GetString("Id"), ""));
                 }
                 result.Connections.Add(info);
             }
@@ -77,14 +72,15 @@ public sealed class SapGuiConnectionManager
         var sta = new StaThreadDispatcher($"sap-session-{Guid.NewGuid():N}");
         return sta.RunAsync(() =>
         {
-            dynamic engine = GetScriptingEngine();
+            var engine = GetScriptingEngine();
 
-            dynamic connection = string.IsNullOrEmpty(request.ConnectionId)
+            var connection = string.IsNullOrEmpty(request.ConnectionId)
                 // VERIFY-ON-TARGET: GuiApplication.OpenConnection(string description, bool sync)
-                ? engine.OpenConnection(request.SystemDescription, true)
+                ? engine.CallCom("OpenConnection", request.SystemDescription, true)
                 : FindConnectionById(engine, request.ConnectionId);
 
-            dynamic nativeSession = connection.Children.ElementAt(connection.Children.Count - 1);
+            var sessions = connection.Collection("Children").ToList();
+            var nativeSession = sessions[^1];
 
             // Best-effort login: only fills fields that are actually present on the
             // logon screen (e.g. a fresh OpenConnection); reused/pre-authenticated
@@ -95,12 +91,12 @@ public sealed class SapGuiConnectionManager
             TryFillLogonField(nativeSession, "wnd[0]/usr/txtRSYST-LANGU", request.Language);
             if (!string.IsNullOrEmpty(request.User))
             {
-                try { nativeSession.FindById("wnd[0]").SendVKey(0); } catch { /* not on a logon screen */ }
+                try { nativeSession.CallCom("FindById", "wnd[0]").Call("SendVKey", 0); } catch { /* not on a logon screen */ }
             }
 
-            var session = new SapGuiComSession(nativeSession);
+            var session = new SapGuiComSession(nativeSession.Target);
 
-            var systemName = SapGuiComComponent.TryGet(() => (string)nativeSession.Info.SystemName, "");
+            var systemName = ComHandle.TryGet(() => nativeSession.GetCom("Info").GetString("SystemName"), "");
             if (!IsAllowed(systemName))
             {
                 throw new InvalidOperationException(
@@ -112,12 +108,12 @@ public sealed class SapGuiConnectionManager
         });
     }
 
-    private static void TryFillLogonField(dynamic session, string id, string value)
+    private static void TryFillLogonField(ComHandle session, string id, string value)
     {
         if (string.IsNullOrEmpty(value)) return;
         try
         {
-            session.FindById(id).Text = value;
+            session.CallCom("FindById", id).Set("Text", value);
         }
         catch
         {
@@ -126,14 +122,11 @@ public sealed class SapGuiConnectionManager
         }
     }
 
-    private static dynamic FindConnectionById(dynamic engine, string connectionId)
+    private static ComHandle FindConnectionById(ComHandle engine, string connectionId)
     {
-        dynamic connections = engine.Connections;
-        int count = (int)connections.Count;
-        for (var i = 0; i < count; i++)
+        foreach (var connection in engine.Collection("Connections"))
         {
-            dynamic connection = connections.ElementAt(i);
-            if (SapGuiComComponent.TryGet(() => (string)connection.Id, "") == connectionId)
+            if (ComHandle.TryGet(() => connection.GetString("Id"), "") == connectionId)
             {
                 return connection;
             }
@@ -164,7 +157,7 @@ public sealed class SapGuiConnectionManager
         {
             try
             {
-                entry.Session.Native.FindById("wnd[0]").Close(); // VERIFY-ON-TARGET
+                new ComHandle(entry.Session.Native).CallCom("FindById", "wnd[0]").Call("Close"); // VERIFY-ON-TARGET
             }
             catch
             {

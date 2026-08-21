@@ -13,11 +13,11 @@ public sealed class ScreenshotService
 {
     public ImageBlob Capture(IComComponent component)
     {
-        dynamic native = component.Native;
-        var left = SapGuiComComponent.TryGet(() => (int)native.ScreenLeft, 0);
-        var top = SapGuiComComponent.TryGet(() => (int)native.ScreenTop, 0);
-        var width = Math.Max(1, SapGuiComComponent.TryGet(() => (int)native.Width, 1));
-        var height = Math.Max(1, SapGuiComComponent.TryGet(() => (int)native.Height, 1));
+        var native = new ComHandle(component.Native);
+        var left = ComHandle.TryGet(() => native.GetInt("ScreenLeft"), 0);
+        var top = ComHandle.TryGet(() => native.GetInt("ScreenTop"), 0);
+        var width = Math.Max(1, ComHandle.TryGet(() => native.GetInt("Width"), 1));
+        var height = Math.Max(1, ComHandle.TryGet(() => native.GetInt("Height"), 1));
 
         using var bitmap = new Bitmap(width, height);
         using var graphics = Graphics.FromImage(bitmap);

@@ -84,18 +84,18 @@ public sealed class ScreenScanner : IScreenScanner
 
     private static void FillCommonProperties(IComComponent component, ComponentNode node)
     {
-        dynamic native = component.Native;
-        node.Text = SapGuiComComponent.TryGet(() => (string)native.Text, "");
-        node.Tooltip = SapGuiComComponent.TryGet(() => (string)native.Tooltip, "");
-        node.DefaultTooltip = SapGuiComComponent.TryGet(() => (string)native.DefaultTooltip, "");
-        node.IconName = SapGuiComComponent.TryGet(() => (string)native.IconName, "");
-        node.ScreenLeft = SapGuiComComponent.TryGet(() => (int)native.ScreenLeft, 0);
-        node.ScreenTop = SapGuiComComponent.TryGet(() => (int)native.ScreenTop, 0);
-        node.Width = SapGuiComComponent.TryGet(() => (int)native.Width, 0);
-        node.Height = SapGuiComComponent.TryGet(() => (int)native.Height, 0);
-        node.Changeable = SapGuiComComponent.TryGet(() => (bool)native.Changeable, false);
-        node.Modified = SapGuiComComponent.TryGet(() => (bool)native.Modified, false);
-        node.IsContainer = SapGuiComComponent.TryGet(() => (bool)native.ContainerType, false);
+        var native = new ComHandle(component.Native);
+        node.Text = ComHandle.TryGet(() => native.GetString("Text"), "");
+        node.Tooltip = ComHandle.TryGet(() => native.GetString("Tooltip"), "");
+        node.DefaultTooltip = ComHandle.TryGet(() => native.GetString("DefaultTooltip"), "");
+        node.IconName = ComHandle.TryGet(() => native.GetString("IconName"), "");
+        node.ScreenLeft = ComHandle.TryGet(() => native.GetInt("ScreenLeft"), 0);
+        node.ScreenTop = ComHandle.TryGet(() => native.GetInt("ScreenTop"), 0);
+        node.Width = ComHandle.TryGet(() => native.GetInt("Width"), 0);
+        node.Height = ComHandle.TryGet(() => native.GetInt("Height"), 0);
+        node.Changeable = ComHandle.TryGet(() => native.GetBool("Changeable"), false);
+        node.Modified = ComHandle.TryGet(() => native.GetBool("Modified"), false);
+        node.IsContainer = ComHandle.TryGet(() => native.GetBool("ContainerType"), false);
     }
 
     private static string ComputeHash(string canonical)

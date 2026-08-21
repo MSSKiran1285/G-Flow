@@ -1,27 +1,28 @@
 namespace SapGuiAgent.Com;
 
 /// <summary>Late-bound wrapper around one SAP GUI Scripting `GuiComponent` COM object.
-/// See docs/assumptions.md for why this is dynamic rather than an early-bound interop type.</summary>
+/// See docs/assumptions.md for why this uses `ComHandle`/`Type.InvokeMember` rather than
+/// C#'s `dynamic` keyword.</summary>
 public sealed class SapGuiComComponent : IComComponent
 {
-    private readonly dynamic _native;
+    private readonly ComHandle _handle;
 
-    public SapGuiComComponent(dynamic native)
+    public SapGuiComComponent(object native)
     {
-        _native = native;
+        _handle = new ComHandle(native);
     }
 
-    public dynamic Native => _native;
+    public object Native => _handle.Target;
 
-    public string Id => TryGet(() => (string)_native.Id, "");
-    public string Type => TryGet(() => (string)_native.Type, "");
-    public int TypeAsNumber => TryGet(() => (int)_native.TypeAsNumber, 0);
+    public string Id => ComHandle.TryGet(() => _handle.GetString("Id"), "");
+    public string Type => ComHandle.TryGet(() => _handle.GetString("Type"), "");
+    public int TypeAsNumber => ComHandle.TryGet(() => _handle.GetInt("TypeAsNumber"), 0);
 
     // VERIFY-ON-TARGET: only GuiShell-family components expose SubType; others throw, and
     // we treat that as "no sub type" rather than an error.
-    public string SubType => TryGet(() => (string)_native.SubType, "");
+    public string SubType => ComHandle.TryGet(() => _handle.GetString("SubType"), "");
 
-    public string Name => TryGet(() => (string)_native.Name, "");
+    public string Name => ComHandle.TryGet(() => _handle.GetString("Name"), "");
 
     public IReadOnlyList<IComComponent> Children
     {
@@ -33,11 +34,9 @@ public sealed class SapGuiComComponent : IComComponent
                 // VERIFY-ON-TARGET: GuiVComponent/GuiContainer expose Children with
                 // Count + ElementAt(int); a true leaf (e.g. GuiTextField) throws here,
                 // which we treat as "no children" rather than an error.
-                dynamic children = _native.Children;
-                int count = (int)children.Count;
-                for (int i = 0; i < count; i++)
+                foreach (var child in _handle.Collection("Children"))
                 {
-                    list.Add(new SapGuiComComponent(children.ElementAt(i)));
+                    list.Add(new SapGuiComComponent(child.Target));
                 }
             }
             catch
@@ -45,18 +44,6 @@ public sealed class SapGuiComComponent : IComComponent
                 // Leaf component — empty list.
             }
             return list;
-        }
-    }
-
-    internal static T TryGet<T>(Func<T> getter, T fallback)
-    {
-        try
-        {
-            return getter();
-        }
-        catch
-        {
-            return fallback;
         }
     }
 }

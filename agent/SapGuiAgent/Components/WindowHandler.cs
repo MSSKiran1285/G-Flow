@@ -15,23 +15,23 @@ public sealed class WindowHandler : ComponentHandlerBase, IWindowHandler, ILegac
 
     protected override Task<ActionResult> ExecuteCoreAsync(IComComponent component, ActionRequest request, CancellationToken ct)
     {
-        dynamic native = component.Native;
+        var native = new ComHandle(component.Native);
         switch (request.Op)
         {
             case ActionOp.SendVkey:
-                native.SendVKey(VKeyCodes.Resolve(request.Params.Vkey)); // VERIFY-ON-TARGET
+                native.Call("SendVKey", VKeyCodes.Resolve(request.Params.Vkey)); // VERIFY-ON-TARGET
                 return Task.FromResult(new ActionResult { Success = true });
             case ActionOp.WindowMaximize:
-                native.Maximize(); // VERIFY-ON-TARGET: GuiFrameWindow.Maximize()
+                native.Call("Maximize"); // VERIFY-ON-TARGET: GuiFrameWindow.Maximize()
                 return Task.FromResult(new ActionResult { Success = true });
             case ActionOp.WindowResize:
-                native.ResizeWorkingPane(request.Params.Row, request.Params.SashPosition, false); // VERIFY-ON-TARGET signature
+                native.Call("ResizeWorkingPane", request.Params.Row, request.Params.SashPosition, false); // VERIFY-ON-TARGET signature
                 return Task.FromResult(new ActionResult { Success = true });
             case ActionOp.WindowClose:
-                native.Close(); // VERIFY-ON-TARGET: GuiFrameWindow.Close()
+                native.Call("Close"); // VERIFY-ON-TARGET: GuiFrameWindow.Close()
                 return Task.FromResult(new ActionResult { Success = true });
             case ActionOp.Verify:
-                string title = native.Text;
+                var title = native.GetString("Text");
                 var ok = Compare(title, request.Params);
                 return Task.FromResult(new ActionResult
                 {

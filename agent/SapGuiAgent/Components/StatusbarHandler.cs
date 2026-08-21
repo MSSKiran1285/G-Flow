@@ -14,7 +14,7 @@ public sealed class StatusbarHandler : ComponentHandlerBase, IStatusbarHandler
 
     protected override Task<ActionResult> ExecuteCoreAsync(IComComponent component, ActionRequest request, CancellationToken ct)
     {
-        dynamic native = component.Native;
+        var native = new ComHandle(component.Native);
         switch (request.Op)
         {
             case ActionOp.StatusbarRead:
@@ -25,7 +25,7 @@ public sealed class StatusbarHandler : ComponentHandlerBase, IStatusbarHandler
                 return Task.FromResult(result);
             }
             case ActionOp.StatusbarOpenLongText:
-                native.DoubleClick(); // VERIFY-ON-TARGET: GuiStatusbar.DoubleClick()
+                native.Call("DoubleClick"); // VERIFY-ON-TARGET: GuiStatusbar.DoubleClick()
                 return Task.FromResult(new ActionResult { Success = true });
             default:
                 throw new UnsupportedOperationException($"{request.Op} is not supported on GuiStatusbar");
@@ -33,11 +33,13 @@ public sealed class StatusbarHandler : ComponentHandlerBase, IStatusbarHandler
     }
 
     // VERIFY-ON-TARGET: GuiStatusbar member names (MessageType/MessageId/MessageNumber/Text).
-    internal static StatusbarMessage ReadMessage(dynamic native) => new()
+    internal static StatusbarMessage ReadMessage(ComHandle native) => new()
     {
-        Type = SapGuiComComponent.TryGet(() => (string)native.MessageType, ""),
-        Text = SapGuiComComponent.TryGet(() => (string)native.Text, ""),
-        MessageId = SapGuiComComponent.TryGet(() => (string)native.MessageId, ""),
-        MessageNumber = SapGuiComComponent.TryGet(() => (string)native.MessageNumber, ""),
+        Type = ComHandle.TryGet(() => native.GetString("MessageType"), ""),
+        Text = ComHandle.TryGet(() => native.GetString("Text"), ""),
+        MessageId = ComHandle.TryGet(() => native.GetString("MessageId"), ""),
+        MessageNumber = ComHandle.TryGet(() => native.GetString("MessageNumber"), ""),
     };
+
+    internal static StatusbarMessage ReadMessage(object native) => ReadMessage(new ComHandle(native));
 }

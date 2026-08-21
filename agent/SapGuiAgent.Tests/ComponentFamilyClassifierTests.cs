@@ -24,6 +24,10 @@ public class ComponentFamilyClassifierTests
     [InlineData("GuiShell", "Tree", ComponentFamily.FamilyTree)]
     [InlineData("GuiShell", "TextEdit", ComponentFamily.FamilyTextShell)]
     [InlineData("GuiShell", "Calendar", ComponentFamily.FamilyOtherShell)]
+    [InlineData("GuiTitlebar", "", ComponentFamily.FamilyStructure)]
+    [InlineData("GuiCustomControl", "", ComponentFamily.FamilyStructure)]
+    [InlineData("GuiStatusPane", "", ComponentFamily.FamilyStatusbar)]
+    [InlineData("GuiSplitterShell", "Splitter", ComponentFamily.FamilyOtherShell)]
     [InlineData("GuiSomeFutureType", "", ComponentFamily.FamilyUnknown)]
     public void Classify_maps_sap_type_and_subtype_to_family(string sapType, string subType, ComponentFamily expected)
     {

@@ -33,6 +33,7 @@ ROOTS = [
     ("microsoft.aspnetcore.app.ref", "8.0.30"),
     ("microsoft.windowsdesktop.app.ref", "8.0.30"),
     ("microsoft.netcore.app.host.win-x64", "8.0.30"),
+    ("microsoft.netcore.app.host.win-x86", "8.0.30"),
 ]
 
 NS = {"n": "http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd",

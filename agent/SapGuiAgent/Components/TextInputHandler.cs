@@ -13,18 +13,18 @@ public sealed class TextInputHandler : ComponentHandlerBase, ITextInputHandler
 
     protected override Task<ActionResult> ExecuteCoreAsync(IComComponent component, ActionRequest request, CancellationToken ct)
     {
-        dynamic native = component.Native;
+        var native = new ComHandle(component.Native);
         var masked = component.Type == "GuiPasswordField";
 
         switch (request.Op)
         {
             case ActionOp.Read:
             {
-                string text = native.Text;
+                var text = native.GetString("Text");
                 return Task.FromResult(new ActionResult { Success = true, ActualValue = masked ? "" : text, Masked = masked });
             }
             case ActionOp.Set:
-                native.Text = request.Params.TextValue;
+                native.Set("Text", request.Params.TextValue);
                 return Task.FromResult(new ActionResult
                 {
                     Success = true,
@@ -33,7 +33,7 @@ public sealed class TextInputHandler : ComponentHandlerBase, ITextInputHandler
                 });
             case ActionOp.Verify:
             {
-                string actual = native.Text;
+                var actual = native.GetString("Text");
                 var ok = Compare(actual, request.Params);
                 return Task.FromResult(new ActionResult
                 {

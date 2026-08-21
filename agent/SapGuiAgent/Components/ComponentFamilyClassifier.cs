@@ -14,11 +14,16 @@ public static class ComponentFamilyClassifier
             "GuiComboBox" or "GuiCheckBox" or "GuiRadioButton" => ComponentFamily.FamilySelection,
             "GuiButton" or "GuiOkCodeField" or "GuiMenubar" or "GuiMenu" or "GuiToolbar" => ComponentFamily.FamilyAction,
             "GuiTabStrip" or "GuiTab" or "GuiSimpleContainer" or "GuiScrollContainer"
-                or "GuiUserArea" or "GuiBox" or "GuiLabel" or "GuiContainerShell" => ComponentFamily.FamilyStructure,
+                or "GuiUserArea" or "GuiBox" or "GuiLabel" or "GuiContainerShell"
+                or "GuiTitlebar" or "GuiCustomControl" => ComponentFamily.FamilyStructure,
             "GuiMainWindow" or "GuiModalWindow" or "GuiFrameWindow" => ComponentFamily.FamilyWindow,
-            "GuiStatusbar" => ComponentFamily.FamilyStatusbar,
+            "GuiStatusbar" or "GuiStatusPane" => ComponentFamily.FamilyStatusbar,
             "GuiTableControl" => ComponentFamily.FamilyTableControl,
             "GuiShell" => ClassifyShell(sapSubType),
+            // Some shell-family controls report a specific .Type directly (e.g.
+            // "GuiSplitterShell") instead of "GuiShell" + SubType — seen live (§ M1
+            // findings); route those through the same shell classifier.
+            _ when sapType.EndsWith("Shell", StringComparison.Ordinal) => ClassifyShell(sapSubType),
             _ => ComponentFamily.FamilyUnknown,
         };
     }

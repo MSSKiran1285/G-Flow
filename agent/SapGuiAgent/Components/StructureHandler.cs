@@ -16,11 +16,11 @@ public sealed class StructureHandler : ComponentHandlerBase, IStructureHandler
 
     protected override Task<ActionResult> ExecuteCoreAsync(IComComponent component, ActionRequest request, CancellationToken ct)
     {
-        dynamic native = component.Native;
+        var native = new ComHandle(component.Native);
 
         if (component.Type == "GuiTab" && request.Op == ActionOp.TabSelect)
         {
-            native.Select(); // VERIFY-ON-TARGET: GuiTab.Select()
+            native.Call("Select"); // VERIFY-ON-TARGET: GuiTab.Select()
             return Task.FromResult(new ActionResult { Success = true });
         }
 
@@ -29,9 +29,9 @@ public sealed class StructureHandler : ComponentHandlerBase, IStructureHandler
             switch (request.Op)
             {
                 case ActionOp.Read:
-                    return Task.FromResult(new ActionResult { Success = true, ActualValue = (string)native.Text });
+                    return Task.FromResult(new ActionResult { Success = true, ActualValue = native.GetString("Text") });
                 case ActionOp.Verify:
-                    string actual = native.Text;
+                    var actual = native.GetString("Text");
                     var ok = Compare(actual, request.Params);
                     return Task.FromResult(new ActionResult
                     {

@@ -16,7 +16,7 @@ public sealed class FakeComComponent : IComComponent
     public List<IComComponent> ChildrenList { get; } = new();
     public IReadOnlyList<IComComponent> Children => ChildrenList;
     public object NativeObject { get; set; } = new();
-    public dynamic Native => NativeObject;
+    public object Native => NativeObject;
 }
 
 public sealed class FakeTextFieldNative

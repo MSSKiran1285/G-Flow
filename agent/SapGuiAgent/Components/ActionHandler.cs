@@ -28,20 +28,19 @@ public sealed class ActionHandler : ComponentHandlerBase, IActionHandler
         {
             throw new UnsupportedOperationException($"{request.Op} is not supported on GuiButton");
         }
-        dynamic native = component.Native;
-        native.Press(); // VERIFY-ON-TARGET: GuiButton.Press()
+        new ComHandle(component.Native).Call("Press"); // VERIFY-ON-TARGET: GuiButton.Press()
         return Task.FromResult(new ActionResult { Success = true });
     }
 
     private static Task<ActionResult> HandleOkCodeField(IComComponent component, ActionRequest request)
     {
-        dynamic native = component.Native;
+        var native = new ComHandle(component.Native);
         switch (request.Op)
         {
             case ActionOp.Read:
-                return Task.FromResult(new ActionResult { Success = true, ActualValue = (string)native.Text });
+                return Task.FromResult(new ActionResult { Success = true, ActualValue = native.GetString("Text") });
             case ActionOp.Set:
-                native.Text = request.Params.TextValue; // e.g. "/nVA02", "/o"
+                native.Set("Text", request.Params.TextValue); // e.g. "/nVA02", "/o"
                 return Task.FromResult(new ActionResult { Success = true, ActualValue = request.Params.TextValue });
             default:
                 throw new UnsupportedOperationException($"{request.Op} is not supported on GuiOkCodeField");
@@ -55,7 +54,7 @@ public sealed class ActionHandler : ComponentHandlerBase, IActionHandler
             throw new UnsupportedOperationException($"{request.Op} is not supported on {component.Type}");
         }
 
-        dynamic target = component.Native;
+        var target = new ComHandle(component.Native);
         if (!string.IsNullOrEmpty(request.Params.MenuPath))
         {
             foreach (var segment in request.Params.MenuPath.Split("->", StringSplitOptions.TrimEntries))
@@ -66,18 +65,16 @@ public sealed class ActionHandler : ComponentHandlerBase, IActionHandler
             }
         }
 
-        target.Select(); // VERIFY-ON-TARGET: GuiMenu.Select()
+        target.Call("Select"); // VERIFY-ON-TARGET: GuiMenu.Select()
         return Task.FromResult(new ActionResult { Success = true });
     }
 
-    private static dynamic? FindChildByText(dynamic menuOrMenubar, string text)
+    private static ComHandle? FindChildByText(ComHandle menuOrMenubar, string text)
     {
-        dynamic children = menuOrMenubar.Children; // VERIFY-ON-TARGET: GuiMenubar/GuiMenu.Children
-        int count = (int)children.Count;
-        for (var i = 0; i < count; i++)
+        // VERIFY-ON-TARGET: GuiMenubar/GuiMenu.Children
+        foreach (var child in menuOrMenubar.Collection("Children"))
         {
-            dynamic child = children.ElementAt(i);
-            if (string.Equals((string)child.Text, text, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(child.GetString("Text"), text, StringComparison.OrdinalIgnoreCase))
             {
                 return child;
             }

@@ -28,6 +28,45 @@ Per spec §13, recorded here rather than re-confirmed inline.
   the brief; the 8.0.30 runtime + ASP.NET Core 8.0.30 shared framework were installed
   alongside so net8.0 actually runs, not just compiles.
 
+## Live-system findings
+
+- **`dynamic` doesn't work against this SAP GUI installation's COM object — use
+  `Type.InvokeMember` instead.** `Marshal.BindToMoniker("SAPGUI")` itself succeeds (it's
+  an out-of-process COM server, so client/server bitness doesn't need to match), but
+  every C# `dynamic` call into the returned object threw
+  `COMException 0x80029C4A (TYPE_E_CANTLOADLIBRARY)`. Root cause: the DLR's `dynamic`
+  binder calls `IDispatch::GetTypeInfo` to build a richer binding, and this SAP GUI
+  install's registered type library isn't loadable (confirmed independent of process
+  bitness — reproduced identically under both x64 and x86, which is what ruled out a
+  bitness explanation). Fix: `Com/ComHandle.cs` wraps every COM object and calls members
+  via `Type.InvokeMember` (`BindingFlags.Get/Set/InvokeMethod`), which only needs
+  `IDispatch::Invoke`/`GetIDsOfNames` — no type library required. All of `Com/` and
+  `Components/` now go through `ComHandle` instead of `dynamic`; there is no remaining
+  bitness concern, the agent runs as a normal x64 process.
+- An x86 .NET 8 runtime + ASP.NET Core runtime were also installed
+  (`%USERPROFILE%\.dotnet-x86`, a separate root — x86/x64 shared frameworks can't coexist
+  in one) while chasing the bitness theory before the real cause was found. Harmless to
+  leave in place, but not required by anything in this repo.
+- **Confirmed against a real session** (system `GEC`, SAP Easy Access): `ListConnections`
+  → `OpenSession` (reusing an already-authenticated connection, no login fields needed) →
+  `GetSessionInfo` → `ScanScreen` all round-tripped correctly, including the full real
+  `GuiMenubar` tree (100+ nested items) and toolbar buttons. Then a real write path:
+  `SET` on `GuiOkCodeField.Text`, `SEND_VKEY("Enter")` via `GuiFrameWindow.SendVKey(0)`,
+  and `STATUSBAR_READ` returned `{type: "S", text: "Transaction ZZZINVALIDTEST does not
+  exist", message_id: "S#...", message_number: "343"}` for a deliberately-invalid
+  command. So these `VERIFY-ON-TARGET` members are now **confirmed**, not just
+  documented guesses: `GuiSessionInfo.{SystemName,Client,User,Transaction,Program,
+  ScreenNumber}`, `GuiComponent.Children`(`Count`/`ElementAt`), `GuiOkCodeField.Text`,
+  `GuiFrameWindow.SendVKey(int)` with `Enter=0`, `GuiStatusbar.{MessageType,Text,
+  MessageId,MessageNumber}`.
+- **New component types seen on a real screen that M1's classifier didn't cover**:
+  `GuiTitlebar`, `GuiCustomControl`, `GuiStatusPane` — all plain window-chrome types,
+  not GuiShell/M2 material, just missing from `ComponentFamilyClassifier`. Also:
+  `GuiSplitterShell` was seen reported directly as `.Type` (not `"GuiShell"` +
+  `SubType="Splitter"` as the spec's naming suggested) — the classifier's `GuiShell`
+  dispatch-on-subtype path doesn't catch this; worth widening when GuiShell coverage
+  lands in M2.
+
 ## Design
 
 - **`SapGuiAgent.csproj` uses `net8.0-windows`**, not bare `net8.0`: the agent is

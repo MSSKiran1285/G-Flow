@@ -3,27 +3,27 @@ using SapGuiAgent.Grpc;
 namespace SapGuiAgent.Com;
 
 /// <summary>Late-bound wrapper around one SAP GUI Scripting `GuiSession` COM object.
-/// All calls against `_native` must run on the session's own STA thread — callers get
+/// All calls against `_handle` must run on the session's own STA thread — callers get
 /// there via the paired <see cref="StaThreadDispatcher"/> held by the connection manager;
 /// this class itself assumes it is already being called from that thread.</summary>
 public sealed class SapGuiComSession : IComSession
 {
-    private readonly dynamic _native;
+    private readonly ComHandle _handle;
     private readonly List<string> _okCodeHistory = new();
 
-    public SapGuiComSession(dynamic native)
+    public SapGuiComSession(object native)
     {
-        _native = native;
+        _handle = new ComHandle(native);
     }
 
-    public dynamic Native => _native;
+    public object Native => _handle.Target;
 
-    public string Id => SapGuiComComponent.TryGet(() => (string)_native.Id, "");
+    public string Id => ComHandle.TryGet(() => _handle.GetString("Id"), "");
 
     // VERIFY-ON-TARGET: GuiSession.Busy
-    public bool Busy => SapGuiComComponent.TryGet(() => (bool)_native.Busy, false);
+    public bool Busy => ComHandle.TryGet(() => _handle.GetBool("Busy"), false);
 
-    public IComComponent Root => new SapGuiComComponent(_native.FindById("wnd[0]"));
+    public IComComponent Root => new SapGuiComComponent(_handle.Call("FindById", "wnd[0]")!);
 
     public IReadOnlyList<IComComponent> ModalWindows
     {
@@ -45,7 +45,8 @@ public sealed class SapGuiComSession : IComSession
     {
         try
         {
-            return new SapGuiComComponent(_native.FindById(id));
+            var native = _handle.Call("FindById", id);
+            return native is null ? null : new SapGuiComComponent(native);
         }
         catch
         {
@@ -55,22 +56,22 @@ public sealed class SapGuiComSession : IComSession
 
     public ScreenContext CaptureContext()
     {
-        dynamic info = _native.Info; // VERIFY-ON-TARGET: GuiSessionInfo member names below
+        var info = _handle.GetCom("Info"); // VERIFY-ON-TARGET: GuiSessionInfo member names below
         var context = new ScreenContext
         {
-            SystemId = SapGuiComComponent.TryGet(() => (string)info.SystemName, ""),
-            Client = SapGuiComComponent.TryGet(() => (string)info.Client, ""),
-            User = SapGuiComComponent.TryGet(() => (string)info.User, ""),
-            TransactionCode = SapGuiComComponent.TryGet(() => (string)info.Transaction, ""),
-            Program = SapGuiComComponent.TryGet(() => (string)info.Program, ""),
-            ScreenNumber = SapGuiComComponent.TryGet(() => info.ScreenNumber.ToString(), ""),
-            WindowTitle = SapGuiComComponent.TryGet(() => (string)Root.Native.Text, ""),
+            SystemId = ComHandle.TryGet(() => info.GetString("SystemName"), ""),
+            Client = ComHandle.TryGet(() => info.GetString("Client"), ""),
+            User = ComHandle.TryGet(() => info.GetString("User"), ""),
+            TransactionCode = ComHandle.TryGet(() => info.GetString("Transaction"), ""),
+            Program = ComHandle.TryGet(() => info.GetString("Program"), ""),
+            ScreenNumber = ComHandle.TryGet(() => info.Get("ScreenNumber")?.ToString() ?? "", ""),
+            WindowTitle = ComHandle.TryGet(() => new ComHandle(Root.Native).GetString("Text"), ""),
         };
         var modals = ModalWindows;
         context.WindowCount = 1 + modals.Count;
         foreach (var modal in modals)
         {
-            context.ModalStack.Add(SapGuiComComponent.TryGet(() => (string)modal.Native.Text, ""));
+            context.ModalStack.Add(ComHandle.TryGet(() => new ComHandle(modal.Native).GetString("Text"), ""));
         }
         return context;
     }
@@ -78,7 +79,7 @@ public sealed class SapGuiComSession : IComSession
     public void SendVKey(int vkey)
     {
         // VERIFY-ON-TARGET: GuiFrameWindow.SendVKey(int)
-        _native.FindById("wnd[0]").SendVKey(vkey);
+        _handle.CallCom("FindById", "wnd[0]").Call("SendVKey", vkey);
         _okCodeHistory.Add($"VKey:{vkey}");
     }
 
