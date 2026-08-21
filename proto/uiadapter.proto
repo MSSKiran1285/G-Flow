@@ -1,0 +1,577 @@
+syntax = "proto3";
+
+// SapModelTest UI Adapter contract.
+// UI-technology-agnostic by design: this exact contract is implemented today by
+// SapGuiAgent (SAP GUI Scripting) and is intended to be implemented later by a
+// Playwright-based Fiori/UI5 agent without changing message shapes.
+package smt.uiadapter.v1;
+
+option csharp_namespace = "SapGuiAgent.Grpc";
+
+// ---------------------------------------------------------------------------
+// Service
+// ---------------------------------------------------------------------------
+
+service UiAgent {
+  // Session lifecycle
+  rpc ListConnections(ListConnectionsRequest) returns (ConnectionList);
+  rpc OpenSession(OpenSessionRequest) returns (SessionHandle);
+  rpc CloseSession(SessionHandle) returns (Ack);
+  rpc GetSessionInfo(SessionHandle) returns (SessionInfo);
+
+  // The two capabilities everything else hangs on.
+  rpc ScanScreen(ScanRequest) returns (ScreenSnapshot);
+  rpc ExecuteAction(ActionRequest) returns (ActionResult);
+
+  rpc ExecuteBatch(ActionBatch) returns (stream ActionResult);
+  rpc ResolveLocator(LocatorRequest) returns (LocatorCandidates);
+  rpc Subscribe(SessionHandle) returns (stream UiEvent);
+  rpc CaptureScreenshot(CaptureRequest) returns (ImageBlob);
+  rpc GetOkCodeHistory(SessionHandle) returns (OkCodeHistory);
+}
+
+// ---------------------------------------------------------------------------
+// Session lifecycle
+// ---------------------------------------------------------------------------
+
+message ListConnectionsRequest {
+  string contract_version = 1;
+}
+
+message ConnectionInfo {
+  string connection_id = 1;
+  string description = 2;
+  repeated string session_ids = 3;
+}
+
+message ConnectionList {
+  string contract_version = 1;
+  repeated ConnectionInfo connections = 2;
+}
+
+message OpenSessionRequest {
+  string contract_version = 1;
+  // Attach to an already-open GuiConnection, or...
+  string connection_id = 2;
+  // ...open a new one from a SAPLogon entry (system_description matches saplogon.ini).
+  string system_description = 3;
+  string client = 4;
+  string user = 5;
+  string password = 6;
+  string language = 7;
+  // When true, `password` must already be redacted by the caller (structure kept, value stripped);
+  // the agent never logs it either way.
+  bool masked_password = 8;
+}
+
+message SessionHandle {
+  string contract_version = 1;
+  string session_id = 2;
+}
+
+message Ack {
+  string contract_version = 1;
+  bool success = 2;
+  string message = 3;
+}
+
+message ScreenContext {
+  string system_id = 1;
+  string client = 2;
+  string user = 3;
+  string transaction_code = 4;
+  string program = 5;
+  string screen_number = 6;
+  string window_title = 7;
+  int32 window_count = 8;
+  // Titles of currently open wnd[1..n], outermost first; empty when no modal is open.
+  repeated string modal_stack = 9;
+}
+
+message SessionInfo {
+  string contract_version = 1;
+  string session_id = 2;
+  ScreenContext context = 3;
+}
+
+// ---------------------------------------------------------------------------
+// Scanning (see spec §4)
+// ---------------------------------------------------------------------------
+
+message ScanDepthOptions {
+  // Select each tab in turn, scan its contents, restore the original tab afterward.
+  bool deep_tabs = 1;
+  // Page through table/grid scroll positions to capture every row, not just visible ones.
+  bool deep_tables = 2;
+  // Open F4 value help, scan the resulting modal, close it, and record the value-help type.
+  bool probe_f4 = 3;
+  // Component ids the caller explicitly allows the scanner to press (e.g. "expand" buttons)
+  // before continuing the walk.
+  repeated string whitelist_expand_ids = 4;
+}
+
+message ScanRequest {
+  string contract_version = 1;
+  string session_id = 2;
+  // "" = wnd[0]; a specific container id; or "*" = all open windows including modals.
+  string root_id = 3;
+  bool include_modals = 4;
+  ScanDepthOptions depth = 5;
+  // Non-empty triggers a delta scan: only subtrees whose hash differs from this baseline
+  // are returned in full; unchanged subtrees are omitted.
+  string delta_since_hash = 6;
+}
+
+// Our own routing taxonomy from the §5 coverage matrix. NOT part of the SAP GUI Scripting
+// API surface — `type`/`type_as_number`/`sub_type` below carry the real SAP-reported values;
+// this enum only decides which handler family processes a node.
+enum ComponentFamily {
+  FAMILY_UNSPECIFIED = 0;
+  FAMILY_TEXT_INPUT = 1;
+  FAMILY_SELECTION = 2;
+  FAMILY_ACTION = 3;
+  FAMILY_STRUCTURE = 4;
+  FAMILY_WINDOW = 5;
+  FAMILY_STATUSBAR = 6;
+  FAMILY_TABLE_CONTROL = 7;
+  FAMILY_ALV_GRID = 8;
+  FAMILY_TREE = 9;
+  FAMILY_TEXT_SHELL = 10;
+  FAMILY_OTHER_SHELL = 11;
+  FAMILY_LEGACY = 12;
+  FAMILY_UNKNOWN = 99;
+}
+
+message GridColumn {
+  string column_id = 1;
+  string title = 2;
+  string tech_name = 3;
+  int32 order = 4;
+  bool is_fixed = 5;
+  string cell_type = 6; // "text" | "checkbox" | "button" | "link" | ...
+}
+
+message GridCell {
+  string column_id = 1;
+  string value = 2;
+  string cell_type = 3;
+  bool masked = 4;
+}
+
+message GridRow {
+  int32 row_index = 1;
+  repeated GridCell cells = 2;
+}
+
+message ToolbarButton {
+  string id = 1;
+  string tooltip = 2;
+  string type = 3;
+  bool enabled = 4;
+}
+
+message GridViewDetail {
+  repeated GridColumn columns = 1;
+  int32 row_count = 2;
+  int32 visible_row_count = 3;
+  int32 current_cell_row = 4;
+  string current_cell_column_id = 5;
+  string selection_mode = 6;
+  repeated ToolbarButton toolbar_buttons = 7;
+  // Populated only under ScanDepthOptions.deep_tables; otherwise cells are fetched on demand
+  // via ActionOp.GRID_GET_CELL during replay.
+  repeated GridRow rows = 8;
+}
+
+message TreeNode {
+  string key = 1;
+  string text = 2;
+  int32 level = 3;
+  string item_type = 4;
+  bool checkable = 5;
+  bool is_link = 6;
+  repeated TreeNode children = 7;
+}
+
+message TreeDetail {
+  string tree_type = 1; // "simple" | "list" | "column"
+  repeated string column_names = 2;
+  // Populated only under deep-scan; large trees are otherwise walked lazily during replay.
+  repeated TreeNode nodes = 3;
+  bool context_menu_available = 4;
+}
+
+message MenuEntry {
+  string path = 1; // e.g. "System->Status"
+  string id = 2;
+  string text = 3;
+  bool enabled = 4;
+  repeated MenuEntry children = 5;
+}
+
+message ToolbarDetail {
+  repeated ToolbarButton buttons = 1;
+  repeated MenuEntry menus = 2;
+}
+
+message TextEditDetail {
+  string full_text = 1;
+  int32 line_count = 2;
+}
+
+message HtmlViewerDetail {
+  string document_title = 1;
+  string url = 2;
+  // True when the underlying control exposes little beyond title/URL to scripting.
+  bool limited_scriptability = 3;
+}
+
+message CalendarDetail {
+  string selection_start = 1;
+  string selection_end = 2;
+}
+
+message SplitterDetail {
+  int32 sash_position = 1;
+  string orientation = 2;
+}
+
+message TabStripInShellDetail {
+  repeated string tab_ids = 1;
+  string active_tab_id = 2;
+}
+
+message OfficeControlDetail {
+  string kind = 1; // "office" | "picture" | "bar_chart" | "chart_control"
+  map<string, string> metadata = 2;
+  // True when replay of this control is known to be limited or unsupported.
+  bool replay_limited = 3;
+}
+
+// Escape hatch for unmapped/rare GuiShell subtypes: raw property dump, never silently dropped.
+message RawShellDetail {
+  map<string, string> properties = 1;
+}
+
+message ShellDetail {
+  oneof detail {
+    GridViewDetail grid_view = 1;
+    TreeDetail tree = 2;
+    ToolbarDetail toolbar = 3;
+    TextEditDetail text_edit = 4;
+    HtmlViewerDetail html_viewer = 5;
+    CalendarDetail calendar = 6;
+    SplitterDetail splitter = 7;
+    TabStripInShellDetail tab_strip = 8;
+    OfficeControlDetail office_control = 9;
+    RawShellDetail raw = 10;
+  }
+}
+
+message TableColumn {
+  string title = 1;
+  string tech_name = 2;
+  bool fixed = 3;
+}
+
+message ScrollbarModel {
+  int32 position = 1;
+  int32 maximum = 2;
+  int32 page_size = 3;
+}
+
+message TableControlDetail {
+  repeated TableColumn columns = 1;
+  int32 row_count = 2;
+  int32 visible_row_count = 3;
+  ScrollbarModel vertical_scrollbar = 4;
+}
+
+message MenuDetail {
+  repeated MenuEntry entries = 1;
+}
+
+message ComponentNode {
+  string id = 1;              // exact scripting Id
+  string type = 2;            // raw GuiComponent.Type, e.g. "GuiTextField"
+  int32 type_as_number = 3;   // raw GuiComponent.TypeAsNumber
+  string sub_type = 4;        // raw shell SubType, e.g. "GridView"; "" when not applicable
+  ComponentFamily family = 5;
+  string name = 6;
+  string text = 7;
+  string tooltip = 8;
+  string default_tooltip = 9;
+  string icon_name = 10;
+  int32 screen_left = 11;
+  int32 screen_top = 12;
+  int32 width = 13;
+  int32 height = 14;
+  bool changeable = 15;
+  bool modified = 16;
+  bool is_container = 17;
+  bool masked = 18;
+  repeated ComponentNode children = 19;
+  ShellDetail shell_detail = 20;
+  TableControlDetail table_detail = 21;
+  MenuDetail menu_detail = 22;
+  // Fallback / supplemental properties. Always populated (with an `unmapped` flag context)
+  // for component subtypes we don't yet have a typed handler for.
+  map<string, string> raw_properties = 23;
+  bool unmapped = 24;
+  // "" | "unsupported" | "fragile" — see spec §11 coverage-honesty requirement.
+  string coverage_status = 25;
+}
+
+message ScreenSnapshot {
+  string contract_version = 1;
+  string session_id = 2;
+  ScreenContext context = 3;
+  ComponentNode root = 4;
+  string snapshot_hash = 5;
+  int64 captured_at_epoch_ms = 6;
+  // Convenience rollup of every node in this snapshot flagged `unmapped`, for fast
+  // acceptance-checklist scoring (spec §10, W1: "zero unmapped components").
+  repeated string unmapped_component_ids = 7;
+}
+
+// ---------------------------------------------------------------------------
+// Replay (see spec §5)
+// ---------------------------------------------------------------------------
+
+enum ActionOp {
+  ACTION_OP_UNSPECIFIED = 0;
+
+  // Uniform ops (Family: Text input / Selection)
+  READ = 1;
+  SET = 2;
+  VERIFY = 3;
+  PRESS = 4;
+  SELECT = 5;
+
+  // Actions family
+  SEND_VKEY = 6;
+  MENU_SELECT = 7;
+
+  // ALV Grid (GuiShell/GridView)
+  GRID_GET_CELL = 8;
+  GRID_SET_CELL = 9;
+  GRID_SELECT_ROWS = 10;
+  GRID_SELECT_COLUMNS = 11;
+  GRID_CURRENT_CELL = 12;
+  GRID_DOUBLE_CLICK_CELL = 13;
+  GRID_PRESS_TOOLBAR = 14;
+  GRID_CONTEXT_MENU_SELECT = 15;
+  GRID_SET_SCROLL_ROW = 16;
+  GRID_FIND_ROW = 17;
+
+  // Trees (GuiShell/Tree)
+  TREE_EXPAND = 18;
+  TREE_COLLAPSE = 19;
+  TREE_SELECT_NODE = 20;
+  TREE_DOUBLE_CLICK = 21;
+  TREE_CHECK_ITEM = 22;
+  TREE_CLICK_LINK = 23;
+  TREE_CONTEXT_MENU_SELECT = 24;
+
+  // Table control (GuiTableControl)
+  TABLE_GET_CELL = 25;
+  TABLE_SET_CELL = 26;
+  TABLE_SELECT_ROW = 27;
+  TABLE_FIND_ROW = 28;
+  TABLE_CONFIGURE_LAYOUT = 29;
+
+  // Text shell (GuiShell/TextEdit)
+  TEXTEDIT_GET_TEXT = 30;
+  TEXTEDIT_SET_TEXT = 31;
+  TEXTEDIT_VERIFY_CONTAINS = 32;
+
+  // Other shells
+  CALENDAR_SELECT_DATE = 33;
+  CALENDAR_SELECT_RANGE = 34;
+  SPLITTER_SET_SASH = 35;
+
+  // Structure
+  TAB_SELECT = 36;
+
+  // Windows
+  WINDOW_MAXIMIZE = 37;
+  WINDOW_RESIZE = 38;
+  WINDOW_CLOSE = 39;
+  SCROLL_CONTAINER = 40;
+
+  // Statusbar
+  STATUSBAR_READ = 41;
+  STATUSBAR_OPEN_LONG_TEXT = 42;
+
+  // Last resort. Always returns ActionResult.fragile = true.
+  COORDINATE_CLICK_FALLBACK = 43;
+}
+
+message ActionParams {
+  string text_value = 1;
+  string key_value = 2;            // select-by-key
+  string visible_text_value = 3;   // select-by-visible-text
+  string vkey = 4;                 // symbolic: "Enter","F3","F8","Ctrl+S",...
+  string menu_path = 5;            // "System->Status"
+  int32 row = 6;
+  string column_id = 7;
+  repeated int32 rows = 8;
+  repeated string column_ids = 9;
+  string node_key = 10;
+  string item_id = 11;
+  string context_menu_item_id = 12;
+  string toolbar_button_id = 13;
+  string predicate_column_id = 14; // *_FIND_ROW: locate the row where this column ...
+  string predicate_value = 15;     // ... equals this value
+  string date_value = 16;
+  string date_range_end = 17;
+  int32 sash_position = 18;
+  string tab_id = 19;
+  bool verify_masked = 20;
+  string comparator = 21;          // equals|contains|regex|numeric_tolerance|date_format|not_empty
+  string expected_value = 22;
+  double numeric_tolerance = 23;
+  // Escape hatch for rare, family-specific parameters not worth a dedicated field.
+  map<string, string> extra = 24;
+}
+
+message ActionRequest {
+  string contract_version = 1;
+  string session_id = 2;
+  // Exact scripting id. Locator resolution (incl. self-healing) happens in the core via
+  // ResolveLocator before this call; the agent only ever executes against a resolved id.
+  string component_id = 3;
+  ActionOp op = 4;
+  ActionParams params = 5;
+  // Permit COORDINATE_CLICK_FALLBACK when the API genuinely cannot perform the requested op.
+  bool allow_fragile_fallback = 6;
+}
+
+message StatusbarMessage {
+  string type = 1;             // S|E|W|I|A per SAP statusbar MessageType
+  string text = 2;
+  string message_id = 3;
+  string message_number = 4;
+}
+
+message ScreenChangeInfo {
+  bool changed = 1;
+  string old_tcode = 2;
+  string new_tcode = 3;
+  string old_screen = 4;
+  string new_screen = 5;
+  bool modal_opened = 6;
+  bool modal_closed = 7;
+}
+
+message PopupHandled {
+  string window_title = 1;
+  string handler_name = 2;
+  string action_taken = 3;
+}
+
+message ActionResult {
+  string contract_version = 1;
+  bool success = 2;
+  string error_message = 3;
+  string actual_value = 4;
+  bool masked = 5;
+  repeated StatusbarMessage statusbar_deltas = 6;
+  ScreenChangeInfo screen_change = 7;
+  int64 elapsed_ms = 8;
+  ImageBlob screenshot_before = 9;
+  ImageBlob screenshot_after = 10;
+  bool fragile = 11;
+  // Populated when the op raised UnsupportedOperation; ActionResult.success is false.
+  string unsupported_reason = 12;
+  repeated PopupHandled popups_handled = 13;
+}
+
+message ActionBatch {
+  string contract_version = 1;
+  string session_id = 2;
+  repeated ActionRequest steps = 3;
+  bool fail_fast = 4;
+}
+
+// ---------------------------------------------------------------------------
+// Self-healing (see spec §7)
+// ---------------------------------------------------------------------------
+
+message RelativePosition {
+  int32 left = 1;
+  int32 top = 2;
+  string anchor_component_id = 3;
+}
+
+message LocatorFingerprint {
+  string exact_id = 1;
+  string structural_pattern = 2; // id with volatile indices parameterized
+  string tech_field_name = 3;
+  string label_text = 4;
+  string component_type = 5;
+  string sub_type = 6;
+  string tab_context = 7;
+  string screen_context = 8;     // tcode/screen no.
+  RelativePosition relative_position = 9;
+}
+
+message LocatorRequest {
+  string contract_version = 1;
+  string session_id = 2;
+  LocatorFingerprint fingerprint = 3;
+  int32 max_candidates = 4;
+}
+
+message LocatorCandidate {
+  string component_id = 1;
+  double score = 2;
+  string strategy = 3;   // "exact_id" | "structural_pattern" | "semantic" | "llm_adjudication"
+  string rationale = 4;
+}
+
+message LocatorCandidates {
+  string contract_version = 1;
+  repeated LocatorCandidate candidates = 2;
+}
+
+// ---------------------------------------------------------------------------
+// Events, screenshots, misc
+// ---------------------------------------------------------------------------
+
+enum UiEventType {
+  UI_EVENT_UNSPECIFIED = 0;
+  STATUSBAR_MESSAGE = 1;
+  MODAL_OPENED = 2;
+  MODAL_CLOSED = 3;
+  SCREEN_CHANGED = 4;
+  SESSION_LOST = 5;
+}
+
+message UiEvent {
+  string contract_version = 1;
+  string session_id = 2;
+  UiEventType type = 3;
+  StatusbarMessage statusbar = 4;
+  string modal_window_title = 5;
+  ScreenChangeInfo screen_change = 6;
+  string message = 7;
+}
+
+message CaptureRequest {
+  string contract_version = 1;
+  string session_id = 2;
+  string component_id = 3; // "" = full window
+}
+
+message ImageBlob {
+  bytes data = 1;
+  string format = 2; // "png"
+  int32 width = 3;
+  int32 height = 4;
+}
+
+message OkCodeHistory {
+  string contract_version = 1;
+  repeated string ok_codes = 2;
+}

@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="SapGuiAgent.Tests/SapGuiAgent.Tests.csproj" />
+  <Project Path="SapGuiAgent/SapGuiAgent.csproj" />
+</Solution>

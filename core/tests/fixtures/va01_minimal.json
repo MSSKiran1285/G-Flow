@@ -1,0 +1,86 @@
+{
+  "connections": {
+    "contract_version": "0.1.0",
+    "connections": [
+      {"connection_id": "conn1", "description": "Test System [T01]", "session_ids": ["ses1"]}
+    ]
+  },
+  "open_session": {"contract_version": "0.1.0", "session_id": "ses1"},
+  "session_info": {
+    "contract_version": "0.1.0",
+    "session_id": "ses1",
+    "context": {
+      "systemId": "T01",
+      "client": "100",
+      "user": "TESTER",
+      "transactionCode": "VA01",
+      "program": "SAPMV45A",
+      "screenNumber": "4001",
+      "windowTitle": "Create Sales Order: Initial Screen",
+      "windowCount": 1,
+      "modalStack": []
+    }
+  },
+  "scans": {
+    "wnd[0]": {
+      "contractVersion": "0.1.0",
+      "sessionId": "ses1",
+      "context": {
+        "systemId": "T01",
+        "client": "100",
+        "user": "TESTER",
+        "transactionCode": "VA01",
+        "program": "SAPMV45A",
+        "screenNumber": "4001",
+        "windowTitle": "Create Sales Order: Initial Screen",
+        "windowCount": 1,
+        "modalStack": []
+      },
+      "root": {
+        "id": "wnd[0]/usr",
+        "type": "GuiContainerShell",
+        "family": "FAMILY_STRUCTURE",
+        "isContainer": true,
+        "children": [
+          {
+            "id": "wnd[0]/usr/ctxtVBAK-AUART",
+            "type": "GuiCTextField",
+            "typeAsNumber": 4,
+            "name": "VBAK-AUART",
+            "family": "FAMILY_TEXT_INPUT",
+            "text": "",
+            "tooltip": "Order Type",
+            "changeable": true
+          },
+          {
+            "id": "wnd[0]/tbar[0]/btn[11]",
+            "type": "GuiButton",
+            "typeAsNumber": 2,
+            "name": "btn[11]",
+            "family": "FAMILY_ACTION",
+            "tooltip": "Save",
+            "changeable": true
+          }
+        ]
+      },
+      "snapshotHash": "va01-initial-v1",
+      "unmappedComponentIds": []
+    }
+  },
+  "actions": {
+    "wnd[0]/usr/ctxtVBAK-AUART|SET": {
+      "contractVersion": "0.1.0",
+      "success": true,
+      "actualValue": "OR",
+      "elapsedMs": 12
+    },
+    "wnd[0]/tbar[0]/btn[11]|PRESS": {
+      "contractVersion": "0.1.0",
+      "success": true,
+      "statusbarDeltas": [
+        {"type": "S", "text": "Standard Order 1234567 has been saved", "messageId": "V4", "messageNumber": "219"}
+      ],
+      "elapsedMs": 340
+    }
+  }
+}

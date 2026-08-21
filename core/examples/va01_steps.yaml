@@ -1,0 +1,14 @@
+# M1 demo step list: set the VA01 order type and save.
+# Run offline against the recorded fixture:
+#   smt run-steps core/examples/va01_steps.yaml --fixture core/tests/fixtures/va01_minimal.json
+# Or against a live SapGuiAgent:
+#   smt run-steps core/examples/va01_steps.yaml --target localhost:50051
+session:
+  connection_id: conn1
+
+steps:
+  - component_id: "wnd[0]/usr/ctxtVBAK-AUART"
+    op: SET
+    text_value: "OR"
+  - component_id: "wnd[0]/tbar[0]/btn[11]"
+    op: PRESS

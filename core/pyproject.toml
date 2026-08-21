@@ -1,0 +1,45 @@
+[project]
+name = "smt"
+version = "0.1.0"
+description = "SapModelTest Python core: repository, scanner, engine, healing, AI services, API, CLI"
+requires-python = ">=3.11"
+dependencies = [
+    "grpcio>=1.60",
+    "grpcio-tools>=1.60",
+    "protobuf>=4.25",
+    "sqlalchemy>=2.0",
+    "alembic>=1.13",
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.27",
+    "typer>=0.12",
+    "pydantic>=2.6",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "mypy>=1.9",
+    "ruff>=0.4",
+]
+
+[project.scripts]
+smt = "smt.cli.main:app"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+exclude = ["smt/adapter/generated"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["smt*"]
