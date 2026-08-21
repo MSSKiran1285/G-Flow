@@ -23,6 +23,14 @@ public abstract class ComponentHandlerBase : IComponentHandler
         var stopwatch = Stopwatch.StartNew();
         try
         {
+            // Universal across every family (GuiVComponent.SetFocus()) — handled here so
+            // individual handlers don't each need a case for it.
+            if (request.Op == ActionOp.SetFocus)
+            {
+                new ComHandle(component.Native).Call("SetFocus");
+                return new ActionResult { Success = true, ElapsedMs = stopwatch.ElapsedMilliseconds };
+            }
+
             var result = await ExecuteCoreAsync(component, request, ct);
             result.ElapsedMs = stopwatch.ElapsedMilliseconds;
             return result;
@@ -38,10 +46,15 @@ public abstract class ComponentHandlerBase : IComponentHandler
         }
         catch (Exception ex)
         {
+            // Type.InvokeMember (see ComHandle) wraps the real COM failure in a
+            // TargetInvocationException — unwrap it so the message is actually useful.
+            var real = ex is System.Reflection.TargetInvocationException { InnerException: { } inner } ? inner : ex;
             return new ActionResult
             {
                 Success = false,
-                ErrorMessage = ex.Message,
+                ErrorMessage = real is System.Runtime.InteropServices.COMException com
+                    ? $"{real.Message} (HRESULT 0x{com.HResult:X8})"
+                    : real.Message,
                 ElapsedMs = stopwatch.ElapsedMilliseconds,
             };
         }

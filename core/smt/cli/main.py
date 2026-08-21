@@ -6,6 +6,7 @@ agent") without requiring a live SAP session to exercise the wiring.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Optional
 
@@ -44,6 +45,42 @@ def _open_agent(target: Optional[str], fixture: Optional[Path]) -> UiAgentPort:
     if fixture:
         return FakeUiAgent(fixture)
     raise typer.BadParameter("pass either --target host:port or --fixture path")
+
+
+@app.command("mine-o2c")
+def mine_o2c(
+    target: str = typer.Option("localhost:50051", help="SapGuiAgent gRPC target"),
+    out: Path = typer.Option(Path("core/data/o2c_master_data.json"), help="Output JSON path"),
+) -> None:
+    """Mine Order-to-Cash master data (order types, sales org/channel/division) via F4
+    value help on VA01, against a live agent + open SAP GUI connection."""
+    from smt.data.o2c_mining import mine_o2c_master_data
+
+    with UiAgentClient(target) as agent:
+        connection = agent.list_connections().connections[0]
+        data = mine_o2c_master_data(agent, connection.connection_id)
+
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    typer.echo(f"wrote {out} ({sum(len(v) for v in data.values() if isinstance(v, list))} entries)")
+
+
+@app.command("mine-p2p")
+def mine_p2p(
+    target: str = typer.Option("localhost:50051", help="SapGuiAgent gRPC target"),
+    out: Path = typer.Option(Path("core/data/p2p_master_data.json"), help="Output JSON path"),
+) -> None:
+    """Mine Procure-to-Pay master data (vendors) via F4 value help on ME21N, against a
+    live agent + open SAP GUI connection."""
+    from smt.data.p2p_mining import mine_p2p_master_data
+
+    with UiAgentClient(target) as agent:
+        connection = agent.list_connections().connections[0]
+        data = mine_p2p_master_data(agent, connection.connection_id)
+
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    typer.echo(f"wrote {out} ({sum(len(v) for v in data.values() if isinstance(v, list))} entries)")
 
 
 @app.command("run-steps")

@@ -67,6 +67,38 @@ Per spec §13, recorded here rather than re-confirmed inline.
   dispatch-on-subtype path doesn't catch this; worth widening when GuiShell coverage
   lands in M2.
 
+## O2C/P2P data mining (post-M1, ad hoc)
+
+- **Added `SET_FOCUS` (`ActionOp` 44)**, handled generically in `ComponentHandlerBase`
+  for every family (`GuiVComponent.SetFocus()` — confirmed live). Needed because SAP
+  resolves `SEND_VKEY` (e.g. F4 for value help) against whatever currently has focus,
+  not against an arbitrary target id — so mining a field's F4 list requires focusing it
+  first, then sending F4 to the *window*, not the field.
+- **`core/smt/data/f4_miner.py` + `o2c_mining.py` + `p2p_mining.py`**: mine real master
+  data (order types, sales org/channel/division, vendors) straight out of SAP's own F4
+  value-help popups rather than a separate extract or guessed test data. Works because,
+  on this system, these particular F4 popups render as plain positional `GuiLabel`
+  grids (`lbl[col,row]`) — not GuiShell/ALV — so M1's existing dynpro support is
+  sufficient; no M2 work was needed for this.
+- **Component ids can be passed in SAP's short form** (`wnd[0]/usr/...`), not just the
+  full `/app/con[x]/ses[y]/...` form the scanner returns — confirmed live. Mining scripts
+  use the short form so they aren't hardcoded to a particular connection/session index.
+- **The vendor field's F4 is a multi-step flow**, not a single popup: focusing
+  `ctxtMEPO_TOPLINE-SUPERFIELD` on ME21N and pressing F4 opens a "Restrict Value Range"
+  search dialog (tabstrip + a `MAXRECORDS` cap) first; only pressing Enter on *that*
+  opens the actual "Hit List" popup with the vendor rows. `p2p_mining.mine_vendors`
+  hardcodes this specific flow rather than trying to force it through the generic
+  single-shot `mine_simple_f4` helper.
+- **Not yet mined**: purchasing org / purchasing group (P2P) and customer (O2C) —
+  customer/vendor-by-org fields don't expose a simple single-popup F4 on the screens
+  probed so far, and `GuiComboBox.Entries` (which would give the ME21N purchase-doc-type
+  combo box's full value list) isn't exposed through the current `ActionResult` contract
+  (only the selected key is readable via `READ`). A real gap, not a design choice — worth
+  closing alongside real M2 GuiShell work.
+- Mined output is **never committed** (`core/data/` is gitignored) — even in a sandbox
+  system, F4 hit lists can carry real names/business data (e.g. a real person's name
+  showed up as a vendor contact in the mined list).
+
 ## Design
 
 - **`SapGuiAgent.csproj` uses `net8.0-windows`**, not bare `net8.0`: the agent is

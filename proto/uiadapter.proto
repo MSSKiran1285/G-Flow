@@ -405,6 +405,12 @@ enum ActionOp {
 
   // Last resort. Always returns ActionResult.fragile = true.
   COORDINATE_CLICK_FALLBACK = 43;
+
+  // Gives a component keyboard focus. Needed before SEND_VKEY ops (e.g. F4 value help)
+  // that SAP resolves against "whatever currently has focus" rather than a target id.
+  // Handled generically for every family (see ComponentHandlerBase) since GuiVComponent.
+  // SetFocus() is universal, not family-specific.
+  SET_FOCUS = 44;
 }
 
 message ActionParams {

@@ -5,6 +5,9 @@ agent/NuGet.Config.user
 
 # Python
 core/.venv/
+# Mined output from smt mine-o2c/mine-p2p — real vendor/customer master data from
+# whatever system it was run against, even in a sandbox. Never commit this.
+core/data/
 core/**/__pycache__/
 core/**/*.egg-info/
 core/.pytest_cache/
