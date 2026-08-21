@@ -42,6 +42,26 @@ def test_rows_to_entries_honors_explicit_key_column():
     assert entries == [MasterDataEntry(key="91", description="ARJUN PVT LTD")]
 
 
+def test_rows_to_entries_skips_a_banner_row_before_the_real_header():
+    # Reproduces the live "Distribution Channel" F4 bug: row 0 is a one-off banner
+    # ("Sales Organization: G999") with a wider, different column layout than the real
+    # header (row 2) and data rows (4, 5) below it. min(rows) picking row 0 as "the
+    # header" used to pick column 0 (empty) as the key column and drop every real row.
+    rows = {
+        0: {0: "", 1: "Sales Organization", 19: "", 20: "G999", 26: ""},
+        2: {1: "DChl", 6: "Name"},
+        4: {1: "S1", 6: "delear"},
+        5: {1: "S2", 6: "distribution"},
+    }
+
+    entries = rows_to_entries(rows)
+
+    assert entries == [
+        MasterDataEntry(key="S1", description="delear"),
+        MasterDataEntry(key="S2", description="distribution"),
+    ]
+
+
 def test_rows_to_entries_respects_max_entries():
     rows = {1: {1: "Key"}, **{i: {1: str(i)} for i in range(2, 10)}}
 

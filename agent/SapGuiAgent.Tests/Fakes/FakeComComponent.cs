@@ -34,3 +34,23 @@ public sealed class FakeCheckBoxNative
 {
     public bool Selected { get; set; }
 }
+
+public sealed class FakeStringCollection
+{
+    private readonly List<string> _items = new();
+    public int Count => _items.Count;
+    public string ElementAt(int i) => _items[i];
+    public void Add(string s) => _items.Add(s);
+}
+
+public sealed class FakeGridViewNative
+{
+    public int RowCount { get; set; }
+    public int VisibleRowCount { get; set; }
+    public FakeStringCollection ColumnOrder { get; } = new();
+    public int FirstVisibleRow { get; set; }
+    public Dictionary<(int Row, string ColumnId), string> Cells { get; } = new();
+
+    public string GetCellValue(int row, string columnId) =>
+        Cells.TryGetValue((row, columnId), out var value) ? value : "";
+}

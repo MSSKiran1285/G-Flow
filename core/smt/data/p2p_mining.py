@@ -20,7 +20,7 @@ from pathlib import Path
 
 from smt.adapter.generated import uiadapter_pb2 as pb
 from smt.adapter.port import UiAgentPort
-from smt.data.f4_miner import MasterDataEntry, _read_label_grid, _top_window_id
+from smt.data.f4_miner import MasterDataEntry, _read_label_grid, _top_window_id, data_rows
 
 WND0 = "wnd[0]"
 OKCD = f"{WND0}/tbar[0]/okcd"
@@ -57,19 +57,16 @@ def mine_vendors(agent: UiAgentPort, handle: pb.SessionHandle, max_entries: int 
         return []
 
     rows = _read_label_grid(agent, handle, hitlist_id)
-    header_row = min(rows) if rows else None
     # Column layout confirmed live: 1=SearchTerm, 12=Country, 16=PostalCode, 27=City,
     # 53=Name, 79=Vendor (the actual key) — VERIFY-ON-TARGET on other systems/themes.
     # Not using rows_to_entries here: it joins every non-key column into the
     # description, but this table has several unrelated columns (country/postal/city)
-    # we don't want mixed in — only the Name column (53) is wanted.
+    # we don't want mixed in — only the Name column (53) is wanted. data_rows() still
+    # handles skipping the header row (and any banner row) correctly.
     key_col, name_col = 79, 53
 
     entries: list[MasterDataEntry] = []
-    for row in sorted(rows):
-        if row == header_row:
-            continue
-        cols = rows[row]
+    for cols in data_rows(rows):
         vendor = cols.get(key_col, "").strip()
         if not vendor:
             continue

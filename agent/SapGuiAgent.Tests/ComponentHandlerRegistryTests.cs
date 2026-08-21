@@ -17,12 +17,21 @@ public class ComponentHandlerRegistryTests
     }
 
     [Fact]
-    public void Resolve_falls_back_to_NotYetImplemented_for_unimplemented_shell_family()
+    public void Resolve_returns_AlvGridHandler_for_GridView()
     {
         var registry = ComponentHandlerRegistry.CreateDefault();
         var handler = registry.Resolve("GuiShell", "GridView");
-        Assert.IsType<NotYetImplementedHandler>(handler);
+        Assert.IsType<AlvGridHandler>(handler);
         Assert.Equal(ComponentFamily.FamilyAlvGrid, handler.Family);
+    }
+
+    [Fact]
+    public void Resolve_falls_back_to_NotYetImplemented_for_still_unimplemented_shell_family()
+    {
+        var registry = ComponentHandlerRegistry.CreateDefault();
+        var handler = registry.Resolve("GuiShell", "Tree");
+        Assert.IsType<NotYetImplementedHandler>(handler);
+        Assert.Equal(ComponentFamily.FamilyTree, handler.Family);
     }
 
     [Fact]

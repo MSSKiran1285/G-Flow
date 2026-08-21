@@ -90,6 +90,34 @@ def mine_simple_f4(
     return entries
 
 
+def data_rows(rows: dict[int, dict[int, str]]) -> list[dict[int, str]]:
+    """Rows belonging to the table's actual data, in order — banner/spacer rows (whose
+    column layout doesn't match the majority "shape") and the header row itself are
+    excluded. Shared by rows_to_entries and callers that need more than one column
+    (e.g. the vendor hit list, which needs both key and name, not a joined description).
+    """
+    if not rows:
+        return []
+    from collections import Counter
+
+    shape_counts = Counter(frozenset(cols) for cols in rows.values() if cols)
+    if not shape_counts:
+        return []
+    table_shape, _ = shape_counts.most_common(1)[0]
+
+    result = []
+    header_seen = False
+    for row in sorted(rows):
+        cols = rows[row]
+        if frozenset(cols) != table_shape:
+            continue
+        if not header_seen:
+            header_seen = True
+            continue
+        result.append(cols)
+    return result
+
+
 def rows_to_entries(
     rows: dict[int, dict[int, str]],
     *,
@@ -98,18 +126,24 @@ def rows_to_entries(
 ) -> list[MasterDataEntry]:
     """Pure parsing step, split out from mine_simple_f4 so it's testable without a live
     agent: turns a {row: {col: text}} grid (as read off a plain-label F4 popup) into
-    entries, skipping the header row and any row missing the key column."""
-    entries: list[MasterDataEntry] = []
-    header_row = min(rows) if rows else None
-    key_col = key_column if key_column is not None else (
-        min(rows[header_row]) if header_row is not None and rows[header_row] else None
-    )
+    entries, skipping the header row and any row missing the key column.
 
-    for row in sorted(rows):
-        if row == header_row:
-            continue
-        cols = rows[row]
-        if not cols or key_col not in cols or not cols[key_col]:
+    Some popups prefix the actual table with a banner row (e.g. "Sales Organization:
+    G999") that has a different, wider column layout than the header/data rows below it
+    — confirmed live (Distribution Channel F4). Using `min(rows)` as "the header row"
+    picked that banner's leftmost column as the key column and silently dropped every
+    real row. Instead: find the column layout ("shape") most rows actually share, skip
+    any row that doesn't match it (banner/spacer lines), and treat the first
+    shape-matching row as the header.
+    """
+    rows_only = data_rows(rows)
+    if not rows_only:
+        return []
+    key_col = key_column if key_column is not None else min(rows_only[0])
+
+    entries: list[MasterDataEntry] = []
+    for cols in rows_only:
+        if key_col not in cols or not cols[key_col]:
             continue
         desc = " ".join(v for c, v in sorted(cols.items()) if c != key_col and v).strip()
         entries.append(MasterDataEntry(key=cols[key_col], description=desc))

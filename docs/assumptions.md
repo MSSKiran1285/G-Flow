@@ -99,6 +99,40 @@ Per spec §13, recorded here rather than re-confirmed inline.
   system, F4 hit lists can carry real names/business data (e.g. a real person's name
   showed up as a vendor contact in the mined list).
 
+## First full E2E: real saved sales order (post-M1)
+
+- **Guessing valid sales-area/customer/material combinations through blind trial and
+  error doesn't scale** — confirmed live: `G999` ("genpact Sales Org") had almost no
+  customers/materials actually extended to it (`No customer master record exists for
+  sold-to party 266`), and `0001`'s division F4 needed a completely different multi-step
+  search-dialog flow than `G999`'s did. The fix: **read real historical documents
+  straight out of their tables** (VBAK/VBAP for sales orders) via SE16N instead of
+  guessing — every value pulled this way is proven-valid by construction.
+- **This required real M2 work, done now rather than deferred**: SE16N's (and VA05's,
+  ME2M's, ...) result list is a `GuiShell/GridView` (ALV grid) — the exact family M1
+  left as `NotYetImplementedHandler`. Added `AlvGridHandler` (`Components/
+  AlvGridHandler.cs`): read-only for now — `RowCount`/`ColumnOrder` on scan,
+  `GRID_GET_CELL` on replay. That's the minimum slice that makes table-based mining
+  possible; write ops (`SET`, toolbar/context-menu, checkbox/button cells) are still
+  unimplemented, a real fast-follow for M2 proper.
+- **`core/smt/data/table_reader.py`** (`smt read-table <table> <columns...>`) is the
+  general tool this unlocked: navigates to SE16N, runs the default selection, reads
+  named columns off the ALV result. Used to pull real VBAK/VBAP rows and mine a
+  genuinely valid O2C combination: `AUART=OR`, `VKORG=GP01`, `VTWEG=G1`, `SPART=D1`,
+  customer `2`, material `101`.
+- **Full E2E proof, live**: drove VA01 with that combination — order type, sales area,
+  sold-to, one line item (material 101, qty 1) — through a "PO number" warning, pressed
+  Save, confirmed the "Save Incomplete Document" completeness-check popup, and SAP
+  responded `"Standard Order 1975 has been saved"` (message V1/311). Independently
+  re-verified via VA03: net value 100,00, matching what was entered. This is the first
+  fully successful create → save round-trip the framework has produced, using only
+  capabilities already in the M1/early-M2 codebase (dynpro SET/READ, item-table cell
+  addressing, SEND_VKEY, PRESS, the new ALV read path, and F4 mining for the initial
+  screen fields) — no bespoke one-off code was needed once the right master data was in
+  hand.
+- Same `read_table` approach applies directly to P2P (`EKKO`/`EKPO` for purchase
+  orders) and hasn't been attempted yet — likely next step.
+
 ## Design
 
 - **`SapGuiAgent.csproj` uses `net8.0-windows`**, not bare `net8.0`: the agent is

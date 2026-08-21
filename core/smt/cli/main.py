@@ -83,6 +83,26 @@ def mine_p2p(
     typer.echo(f"wrote {out} ({sum(len(v) for v in data.values() if isinstance(v, list))} entries)")
 
 
+@app.command("read-table")
+def read_table_cmd(
+    table: str = typer.Argument(..., help="SAP table name, e.g. VBAK, VBAP, EKKO, EKPO"),
+    columns: list[str] = typer.Argument(..., help="Technical field names to read, e.g. VBELN AUART VKORG"),
+    target: str = typer.Option("localhost:50051", help="SapGuiAgent gRPC target"),
+    max_rows: int = typer.Option(20, help="Maximum rows to read"),
+) -> None:
+    """Read rows straight out of a SAP table via SE16N (ALV grid) — the general way to
+    mine proven-valid master-data combinations from real historical documents."""
+    from smt.data.table_reader import read_table
+
+    with UiAgentClient(target) as agent:
+        connection = agent.list_connections().connections[0]
+        handle = agent.open_session(pb.OpenSessionRequest(connection_id=connection.connection_id))
+        rows = read_table(agent, handle, table, columns, max_rows=max_rows)
+        agent.close_session(handle)
+
+    typer.echo(json.dumps(rows, indent=2))
+
+
 @app.command("run-steps")
 def run_steps(
     yaml_path: Path = typer.Argument(..., help="YAML file with `session` + `steps`"),
