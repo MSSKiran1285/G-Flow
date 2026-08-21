@@ -1,0 +1,71 @@
+# Data-driven O2C sales order creation, assembled from two scanned Modules
+# (VA01_InitialScreen, VA01_ItemEntry) rather than hardcoded component ids.
+#
+# Import once:  smt define-testcase core/examples/va01_create_order_testcase.yaml
+# Run per row:  smt run-testcase VA01_CreateStandardOrder --sheet core/examples/va01_create_order_data.csv
+name: VA01_CreateStandardOrder
+description: Header (order type / sales area) + one line item, then Save.
+steps:
+  # Navigate fresh — a session may be sitting on any screen when this test case starts.
+  - component_id: "wnd[0]/tbar[0]/okcd"
+    action: SET
+    bind: "literal:/nVA01"
+  - component_id: "wnd[0]"
+    action: SEND_VKEY
+    bind: "literal:Enter"
+
+  - module: VA01_InitialScreen
+    attribute: vbak_auart
+    action: SET
+    bind: "column:order_type"
+  - module: VA01_InitialScreen
+    attribute: vbak_vkorg_ctxtVBAK-VKORG
+    action: SET
+    bind: "column:sales_org"
+  - module: VA01_InitialScreen
+    attribute: vbak_vtweg_ctxtVBAK-VTWEG
+    action: SET
+    bind: "column:distribution_channel"
+  - module: VA01_InitialScreen
+    attribute: vbak_spart_ctxtVBAK-SPART
+    action: SET
+    bind: "column:division"
+  - module: VA01_InitialScreen
+    attribute: wnd_0
+    action: SEND_VKEY
+    bind: "literal:Enter"
+
+  - module: VA01_ItemEntry
+    attribute: kuagv_kunnr_ctxtKUAGV-KUNNR
+    action: SET
+    bind: "column:customer"
+  - module: VA01_ItemEntry
+    attribute: rv45a_mabnr
+    action: SET
+    bind: "column:material"
+  - module: VA01_ItemEntry
+    attribute: rv45a_kwmeng
+    action: SET
+    bind: "column:quantity"
+  - module: VA01_ItemEntry
+    attribute: wnd_0
+    action: SEND_VKEY
+    bind: "literal:Enter"
+  # Acknowledges the "Enter PO number" warning and triggers full line-item processing
+  # (pricing, description resolution) — confirmed live, needed every time.
+  - module: VA01_ItemEntry
+    attribute: wnd_0
+    action: SEND_VKEY
+    bind: "literal:Enter"
+  - module: VA01_ItemEntry
+    attribute: btn_11
+    action: PRESS
+    bind: "literal:"
+
+  # "Save Incomplete Document" completeness-check popup — genuinely conditional (only
+  # appears when optional fields like PO number are missing), not part of any scanned
+  # Module since it doesn't exist until Save is pressed.
+  - component_id: "wnd[1]/usr/btnSPOP-VAROPTION1"
+    action: PRESS
+    bind: "literal:"
+    optional: true

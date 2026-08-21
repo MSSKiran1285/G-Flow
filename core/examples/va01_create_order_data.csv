@@ -1,0 +1,3 @@
+order_type,sales_org,distribution_channel,division,customer,material,quantity
+OR,GP01,G1,D1,2,101,1
+OR,GP01,G1,D1,1,2,1

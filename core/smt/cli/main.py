@@ -103,6 +103,76 @@ def read_table_cmd(
     typer.echo(json.dumps(rows, indent=2))
 
 
+@app.command("scan-module")
+def scan_module_cmd(
+    module_name: str = typer.Argument(..., help="Name to save this Module under, e.g. VA01_InitialScreen"),
+    tcode: str = typer.Option(..., help="Transaction code to navigate to"),
+    root_id: str = typer.Option("wnd[0]", help="Root component id to scan (short form)"),
+    target: str = typer.Option("localhost:50051", help="SapGuiAgent gRPC target"),
+    no_navigate: bool = typer.Option(False, help="Scan the current screen instead of navigating to --tcode first"),
+    prefill: list[str] = typer.Option([], help="component_id=value pairs to SET before scanning, e.g. wnd[0]/usr/ctxtVBAK-AUART=OR"),
+    vkey_before_scan: list[str] = typer.Option([], help="VKeys to send (in order) after prefill, before scanning, e.g. Enter"),
+) -> None:
+    """Scan a live screen and persist it as a reusable Module (spec §3/§4) — the
+    missing link between the engine and an authorable, data-drivable TestCase."""
+    from smt.repository.db import init_db, make_engine, make_session_factory
+    from smt.repository.scanning import scan_module
+
+    prefill_map = dict(p.split("=", 1) for p in prefill)
+    engine = make_engine()
+    init_db(engine)
+    session_factory = make_session_factory(engine)
+
+    with UiAgentClient(target) as agent:
+        connection = agent.list_connections().connections[0]
+        handle = agent.open_session(pb.OpenSessionRequest(connection_id=connection.connection_id))
+        module_id, count = scan_module(
+            agent, handle, session_factory,
+            module_name=module_name, tcode=tcode, root_id=root_id,
+            navigate=not no_navigate, prefill=prefill_map, vkeys_before_scan=vkey_before_scan,
+        )
+        agent.close_session(handle)
+
+    typer.echo(f"saved Module '{module_name}' ({module_id}) with {count} attributes")
+
+
+@app.command("define-testcase")
+def define_testcase_cmd(
+    yaml_path: Path = typer.Argument(..., help="YAML test-case definition (name, description, steps)"),
+) -> None:
+    """Import a YAML test-case definition into the repository (re-importing an existing
+    name replaces it)."""
+    from smt.engine.executor import define_test_case
+    from smt.repository.db import init_db, make_engine, make_session_factory
+
+    engine = make_engine()
+    init_db(engine)
+    test_case = define_test_case(make_session_factory(engine), yaml_path)
+    typer.echo(f"saved TestCase '{test_case.name}' ({test_case.id})")
+
+
+@app.command("run-testcase")
+def run_testcase_cmd(
+    test_case_name: str = typer.Argument(..., help="Name of a TestCase already imported via define-testcase"),
+    sheet: Path = typer.Option(..., help="CSV TestSheet — one row per data-driven run"),
+    target: str = typer.Option("localhost:50051", help="SapGuiAgent gRPC target"),
+) -> None:
+    """Run a persisted, data-driven TestCase against a live agent, one execution per
+    TestSheet row."""
+    from smt.engine.executor import run_test_case
+    from smt.repository.db import make_engine, make_session_factory
+
+    session_factory = make_session_factory(make_engine())
+
+    with UiAgentClient(target) as agent:
+        connection = agent.list_connections().connections[0]
+        results = run_test_case(agent, session_factory, test_case_name, sheet, connection.connection_id)
+
+    for r in results:
+        status = "PASS" if r.success else f"FAIL (step {r.failed_at_step})"
+        typer.echo(f"row {r.row_index} [{status}]: {r.message}")
+
+
 @app.command("run-steps")
 def run_steps(
     yaml_path: Path = typer.Argument(..., help="YAML file with `session` + `steps`"),

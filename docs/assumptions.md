@@ -133,6 +133,48 @@ Per spec §13, recorded here rather than re-confirmed inline.
 - Same `read_table` approach applies directly to P2P (`EKKO`/`EKPO` for purchase
   orders) and hasn't been attempted yet — likely next step.
 
+## Repository + Engine MVP: assembling and data-driving a test (no GUI yet)
+
+- User asked directly whether there's a front end ready to assemble and data-drive a
+  sales order test. Honest answer at the time: no — the engine layer worked (proven by
+  the order-1975 E2E), but nothing existed above it: no persisted Module/TestCase/
+  TestStep entities, no execution engine resolving bindings, no UI of any kind (`core/
+  api/`, `core/ui/` were still empty placeholders). Per spec §13 this is the M3/M4/M6
+  gap, not an M1/M2 one.
+- User chose **CLI/config-driven now, GUI later** (a full React/FastAPI front end is a
+  separate, much larger effort). Built the real repository/engine slice this unlocks:
+  - `smt/repository/models.py` + `db.py`: SQLAlchemy `Module`/`ModuleAttribute`/
+    `TestCase`/`TestStep`, SQLite by default (spec §3).
+  - `smt/repository/scanning.py` (`smt scan-module`): scans a live screen and persists
+    it as a Module. **Important fix made here**: `ScanScreen` returns the full
+    `/app/con[x]/ses[y]/wnd[...]` path, which is tied to one specific connection/session
+    index. Persisting that directly would break the Module the moment a different
+    session/connection index came along. Component ids are normalized to the short
+    `wnd[0]/...` form before saving — confirmed live that SAP's `FindById` accepts it
+    just as well as the full form.
+  - `smt/engine/executor.py` (`smt define-testcase`, `smt run-testcase`): imports a YAML
+    TestCase definition, resolves each TestStep's (module, semantic_name) to a component
+    id, resolves its binding (`literal:` or `column:<TestSheet column>`) per CSV row, and
+    executes — spec §6's binding/ActionMode model, MVP scope (no buffers/recovery yet).
+    A step can reference a raw `component_id` directly instead of a Module attribute,
+    for elements that only exist conditionally (e.g. a completeness-check popup) and so
+    were never part of any scan; such steps are marked `optional` so a missing component
+    skips rather than fails the row.
+- **Proven live, genuinely data-driven**: scanned `VA01_InitialScreen` (185 attributes)
+  and `VA01_ItemEntry` (561 attributes, including the full item table and menu tree) as
+  real Modules; authored `core/examples/va01_create_order_testcase.yaml` referencing
+  them by semantic name; ran it against `core/examples/va01_create_order_data.csv` (two
+  different real historical combinations, mined the same way as the order-1975 work).
+  Both rows passed independently: **`Standard Order 1976 has been saved`** and
+  **`Standard Order 1977 has been saved`** — two distinct, newly created orders from one
+  assembled, reusable test case, not two one-off scripts. Order 1977 independently
+  re-verified via VA03 (net value 0,00 is correct — material `2` has no pricing
+  condition maintained, not a bug).
+- A test case must include its own navigation as ordinary steps (e.g. `SET` the OK-code
+  field to `/nVA01` then `SEND_VKEY Enter`) — a session may be sitting on any screen when
+  a run starts; the engine has no implicit "go to the right screen" behavior (that would
+  need real Business Process Model support, out of MVP scope here).
+
 ## Design
 
 - **`SapGuiAgent.csproj` uses `net8.0-windows`**, not bare `net8.0`: the agent is
