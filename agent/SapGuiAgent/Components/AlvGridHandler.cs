@@ -52,6 +52,16 @@ public sealed class AlvGridHandler : ComponentHandlerBase, IAlvGridHandler
             case ActionOp.GridSetScrollRow:
                 native.Set("FirstVisibleRow", request.Params.Row); // VERIFY-ON-TARGET
                 return Task.FromResult(new ActionResult { Success = true });
+            case ActionOp.GridDoubleClickCell:
+                // VERIFY-ON-TARGET: GuiGridView.DoubleClick(row, columnId) — the standard
+                // way to open a cell's long text / drill down, e.g. an error log's message.
+                native.Call("DoubleClick", request.Params.Row, request.Params.ColumnId);
+                return Task.FromResult(new ActionResult { Success = true });
+            case ActionOp.GridSelectRows:
+                // VERIFY-ON-TARGET: GuiGridView.SelectedRows — a comma-separated string of
+                // row indices, not a real collection; read back to confirm what was applied.
+                native.Set("SelectedRows", string.Join(",", request.Params.Rows));
+                return Task.FromResult(new ActionResult { Success = true, ActualValue = ComHandle.TryGet(() => (string)native.Get("SelectedRows")!, "") });
             default:
                 throw new UnsupportedOperationException($"{request.Op} is not supported on GuiShell/GridView yet");
         }

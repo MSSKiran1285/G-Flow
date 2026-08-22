@@ -245,7 +245,35 @@ Per spec §13, recorded here rather than re-confirmed inline.
   reasonable-effort stopping point, revisit once Epic 2 grows ALV double-click/selection
   support (would also directly unblock reading *any* ALV error log's long text, not just
   this one).
+- **Closed the ALV gap, then closed off the two cheapest remaining leads too.** Built
+  and unit-tested `GRID_DOUBLE_CLICK_CELL` and `GRID_SELECT_ROWS` on `AlvGridHandler`
+  (40 C# tests passing) plus a real bug fix in `ComponentHandlerBase.ExecuteAsync`
+  (`request.Params ??= new ActionParams();` — protobuf leaves an unset singular message
+  field `null`, and `GRID_SELECT_ROWS` with no rows crashed every handler). Taken live
+  against the VL01N log screen (`SAPLSBAL_DISPLAY`):
+  1. `GRID_DOUBLE_CLICK_CELL` on `T_MSG` (row 0) — no popup, `window_count` stayed 1.
+  2. `GRID_DOUBLE_CLICK_CELL` on `%_ICON_LNG` (row 0) — same, no popup.
+  3. `GRID_SELECT_ROWS([0])` then `SEND_VKEY F5` ("Long Text" per the toolbar) — same,
+     no popup. This log screen's grid apparently doesn't support the usual ALV
+     long-text drill-down gestures, or uses a different one not yet identified.
+  4. Checked whether a delivery was silently created anyway despite the log screen:
+     `read-table LIPS` showed real data only through delivery `80000006`
+     (`VGBEL` 2,3,5,6,7,8) with every row from ~20 onward blank — i.e. the earlier
+     `RowCount=500` was a SE16N display-line artifact, not 500 real rows. No delivery
+     exists for order 1978 anywhere in the table; VL01N is a genuine hard stop, not a
+     UI-reading gap.
+  5. Checked `T001W` `VSTEL` (plant's own default shipping point) for both plants:
+     `1000` and `1001` are both `'0001'` — identical. So the "split" isn't a
+     plant-level shipping-point mismatch, ruling out the one concrete customizing lead
+     that read-table access could cheaply check.
+  Further diagnosis would mean guessing at SAP's shipping-point-determination
+  customizing (delivery grouping / route / item category tables) with no SPRO access
+  and no functional SAP consulting input — not something browser-driven automation can
+  shortcut. Stopping here and flagging for a decision rather than continuing to guess
+  blind.
 - **Net effect on the backlog**: US-5.1 and the engine half of US-5.2 are done and
-  tested; the live 3-real-document chain (US-5.2's last checkbox) and confirming
+  tested; the ALV double-click/select gap that used to block the last checkbox is now
+  closed. The live 3-real-document chain (US-5.2's last checkbox) and confirming
   `delivery_saved`/`billing_saved` against real wording (US-5.3's last checkbox) are
-  blocked on the Epic 2 ALV gap above, not on anything in Epic 5 itself.
+  now blocked purely on VL01N shipping-point-split customizing in this sandbox — a
+  functional/config question, not a framework gap.

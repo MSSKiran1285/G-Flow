@@ -49,8 +49,12 @@ public sealed class FakeGridViewNative
     public int VisibleRowCount { get; set; }
     public FakeStringCollection ColumnOrder { get; } = new();
     public int FirstVisibleRow { get; set; }
+    public string SelectedRows { get; set; } = "";
+    public List<(int Row, string ColumnId)> DoubleClicks { get; } = new();
     public Dictionary<(int Row, string ColumnId), string> Cells { get; } = new();
 
     public string GetCellValue(int row, string columnId) =>
         Cells.TryGetValue((row, columnId), out var value) ? value : "";
+
+    public void DoubleClick(int row, string columnId) => DoubleClicks.Add((row, columnId));
 }

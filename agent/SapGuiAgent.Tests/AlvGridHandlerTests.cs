@@ -53,13 +53,62 @@ public class AlvGridHandlerTests
     }
 
     [Fact]
+    public async Task GridDoubleClickCell_double_clicks_the_requested_cell()
+    {
+        var native = new FakeGridViewNative();
+        var component = BuildGrid(native);
+
+        var result = await new AlvGridHandler().ExecuteAsync(
+            component,
+            new ActionRequest { ComponentId = component.Id, Op = ActionOp.GridDoubleClickCell, Params = new ActionParams { Row = 2, ColumnId = "T_MSG" } },
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal((2, "T_MSG"), Assert.Single(native.DoubleClicks));
+    }
+
+    [Fact]
+    public async Task GridSelectRows_sets_SelectedRows_as_a_comma_joined_list()
+    {
+        var native = new FakeGridViewNative();
+        var component = BuildGrid(native);
+        var request = new ActionRequest { ComponentId = component.Id, Op = ActionOp.GridSelectRows };
+        request.Params = new ActionParams();
+        request.Params.Rows.Add(0);
+        request.Params.Rows.Add(2);
+
+        var result = await new AlvGridHandler().ExecuteAsync(component, request, CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal("0,2", native.SelectedRows);
+        Assert.Equal("0,2", result.ActualValue);
+    }
+
+    [Fact]
+    public async Task A_request_with_no_Params_at_all_does_not_crash()
+    {
+        // Found live: protobuf leaves an unset singular message field null, and a caller
+        // omitting `params` entirely (e.g. GRID_SELECT_ROWS with no rows) used to crash
+        // every handler with a bare NullReferenceException instead of a clean result.
+        var native = new FakeGridViewNative();
+        var component = BuildGrid(native);
+        var request = new ActionRequest { ComponentId = component.Id, Op = ActionOp.GridSelectRows };
+        // request.Params deliberately left unset (null), not assigned.
+
+        var result = await new AlvGridHandler().ExecuteAsync(component, request, CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal("", native.SelectedRows);
+    }
+
+    [Fact]
     public async Task Unsupported_op_fails_honestly_instead_of_faking_success()
     {
         var component = BuildGrid(new FakeGridViewNative());
 
         var result = await new AlvGridHandler().ExecuteAsync(
             component,
-            new ActionRequest { ComponentId = component.Id, Op = ActionOp.GridSelectRows },
+            new ActionRequest { ComponentId = component.Id, Op = ActionOp.GridPressToolbar },
             CancellationToken.None);
 
         Assert.False(result.Success);

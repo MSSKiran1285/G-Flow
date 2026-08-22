@@ -192,10 +192,17 @@ sandbox, not a framework gap (see notes below each story).
         country `GB`, which a material export/legal-control check rejects — switching to
         plant `1001`, genuinely US, fixed order creation: order 1978 saved cleanly on the
         first attempt). VL01N then hit a live "delivery split because of different shipping
-        points" info-log for plant 1001 that never proceeds to an actual delivery — reading
-        its long text needs `GRID_DOUBLE_CLICK_CELL`/row-select on ALV grids, which Epic 2
-        hasn't built yet (M2 gap, tracked there). Stopped digging further rather than keep
-        guessing this sandbox's shipping-point customizing blind.
+        points" info-log for plant 1001 that never proceeds to an actual delivery.
+        `GRID_DOUBLE_CLICK_CELL`/`GRID_SELECT_ROWS` were since built on `AlvGridHandler`
+        (40 C# tests) specifically to read this log entry's long text — live testing found
+        neither double-click (on `T_MSG` or `%_ICON_LNG`) nor row-select+F5 opens the
+        long-text popup on this particular log screen. Confirmed no delivery was silently
+        created anyway (`read-table LIPS` shows real data ends at delivery `80000006`, well
+        short of order 1978). Checked `T001W.VSTEL` for plants `1000`/`1001` — both `'0001'`,
+        so it isn't a plant-level shipping-point mismatch either. This is now a genuine
+        sandbox shipping-point-determination customizing question (delivery grouping /
+        route / item category), not an ALV-reading gap — stopped rather than guess SPRO
+        customizing blind with no functional SAP input.
 
 - **US-5.3** — As a tester, I need the statusbar's message-pattern registry (spec §5)
   to auto-extract known document-number patterns, not require a hand-written regex per
@@ -313,7 +320,7 @@ else works without real test data).
 | Phase | Focus | Epics | Status |
 |---|---|---|---|
 | 0 | Foundation: contract, agent, dynpro+ALV-read coverage, repository/engine MVP, data mining | 1, 2 (partial), 3 (partial), 4 (partial), 6 (partial) | ✅ Done |
-| **1** | **Chained business process**: buffers within and across TestCases, prove VA01→VL01N→VF01 end to end | 5 | 🟡 Engine done, live 3-step proof blocked on Epic 2 (ALV double-click/row-select) |
+| **1** | **Chained business process**: buffers within and across TestCases, prove VA01→VL01N→VF01 end to end | 5 | 🟡 Engine + ALV double-click/select done, live 3-step proof blocked on sandbox shipping-point customizing |
 | 2 | Reporting: JSON/JUnit/HTML so results are usable outside a terminal | 7 | ⬜ |
 | 3 | Full component coverage: GuiTableControl (real scroll math, not row-0-only), ALV write ops, Tree/TextEdit/other shells | 2 | ⬜ |
 | 4 | Scanning maturity + self-healing: AI-enriched naming, review workflow, rescan/merge, locator healing | 3, 8 | ⬜ |
@@ -327,8 +334,13 @@ passing tests). The live 3-step proof surfaced two real, now-fixed order-creatio
 (missing PO number; plant `1000` mislabeled "US" but configured `GB`, which a material
 export/legal-control check correctly rejected — plant `1001` fixed it, order 1978 saved
 cleanly). It then hit a live VL01N "delivery split because of different shipping points"
-info-log that never proceeds to an actual delivery; reading its long text needs
-`GRID_DOUBLE_CLICK_CELL`/row-select on ALV grids, which Epic 2 doesn't have yet. Decision
-point: either build that small ALV slice next (unblocks this directly) or accept the
-engine-level proof as sufficient for now and revisit once Phase 3 (full component
-coverage) lands anyway.
+info-log that never proceeds to an actual delivery. Built `GRID_DOUBLE_CLICK_CELL` and
+`GRID_SELECT_ROWS` on `AlvGridHandler` (40 C# tests) specifically to read that log
+entry's long text — neither opens it on this log screen, no delivery was silently
+created, and the plants involved share the same default shipping point, ruling out the
+one cheap customizing lead available via table reads. This is now a sandbox
+shipping-point-determination customizing question, not a framework gap the codebase can
+close — needs a decision on whether to keep investigating this specific blocker (would
+need SPRO access or functional SAP input neither available here), try a different
+order/customer/route combination on the chance it's data-specific rather than systemic,
+or accept the engine-level proof as sufficient for now and move to a different phase.

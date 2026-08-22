@@ -23,6 +23,12 @@ public abstract class ComponentHandlerBase : IComponentHandler
         var stopwatch = Stopwatch.StartNew();
         try
         {
+            // Protobuf leaves an unset singular message field null (found live: a caller
+            // that omits `params` entirely — e.g. GRID_SELECT_ROWS with no rows — crashed
+            // every handler with a bare NullReferenceException instead of a clean result).
+            request.Params ??= new ActionParams();
+
+
             // Universal across every family (GuiVComponent.SetFocus()) — handled here so
             // individual handlers don't each need a case for it.
             if (request.Op == ActionOp.SetFocus)
