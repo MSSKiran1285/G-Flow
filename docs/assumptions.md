@@ -346,9 +346,78 @@ Per spec §13, recorded here rather than re-confirmed inline.
     lost. Lesson: a coordinate click aimed at a non-scripting popup should be
     re-verified (screenshot or scan) before firing a second blind click at the same
     spot, since the target may have already closed.
-- **Net effect on the backlog**: US-5.1 and the engine half of US-5.2 are done and
-  tested; the ALV double-click/select gap that used to block the last checkbox is now
-  closed. The live 3-real-document chain (US-5.2's last checkbox) and confirming
-  `delivery_saved`/`billing_saved` against real wording (US-5.3's last checkbox) are
-  now blocked purely on VL01N shipping-point-split customizing in this sandbox — a
-  functional/config question, not a framework gap.
+- **Net effect on the backlog (as of the ALV/coordinate-click work)**: US-5.1 and the
+  engine half of US-5.2 are done and tested; the ALV double-click/select gap that used
+  to block the last checkbox is now closed. The live 3-real-document chain (US-5.2's
+  last checkbox) and confirming `delivery_saved`/`billing_saved` against real wording
+  (US-5.3's last checkbox) are now blocked purely on VL01N shipping-point-split
+  customizing in this sandbox — a functional/config question, not a framework gap.
+
+## Phase 1 continued: reverse-engineering a real chain, then a real live delivery
+
+- **Reverse-engineered a real, existing O2C chain from an invoice backward, per direct
+  request** — `VBRP` → `VGBEL` → `LIKP`/`LIPS` → `VBAK`/`VBAP` traced invoice `90000006`
+  back to delivery `80000002` back to order `3` (customer `2`, materials
+  `101–105`, plant `1000`, no split at all). **Explicitly not accepted as E2E proof**:
+  reading a pre-existing historical record proves the data exists but isn't something
+  the framework itself demonstrated — correctly called out and rejected. Used only to
+  understand what a *working* combination looks like.
+- **Investigated plant `1000` in OX10 and found the real reason interactive order
+  creation is blocked there**: its address is a genuine, internally consistent UK
+  location (Burton Upon Trent, `DE14 2WA`, Cambridgeshire) — only the plant's `Name1`
+  ("Std Plant US") is misleading. Changing `Country Key` to `US` would fabricate a
+  false address purely to pass the legal-control check, so this was explicitly **not**
+  done — flagged to the user and rejected in favor of an honest path.
+- **Root-caused and fixed the VL01N split without ever touching config**: `TVSTZ`
+  (Shipping Point Determination) shows shipping condition `01` + loading group `0001`
+  → proposed shipping point `GP01`, not `0001` — the value every historical delivery
+  happened to use (from bulk-loaded data). Setting `LIKP-VSTEL = "GP01"` (not `0001`)
+  on VL01N's initial screen, plus widening the selection date past the order's schedule
+  line, took the transaction straight to `SAPMV50A` ("Outbound Delivery Create:
+  Overview") — no split, no log screen. Saving created **Outbound Delivery `80001138`
+  for order `1979`, a real document created live by the framework's own automation** —
+  the first delivery ever created in this project, not just an order.
+- **Billing (`VF01`) then surfaced a real, ordinary O2C prerequisite**: "Goods issue has
+  not been posted for the delivery." Posting it (`VL02N`, "Post Goods Issue" button)
+  surfaced two more real, fixable gaps in sequence:
+  1. "The storage location is not defined for delivery item 000010" — `read-table
+     T001L` had shown *zero* storage locations for plant `1001`, but that was a real
+     limitation of the mining tool (no selection-screen filter support, so rows outside
+     its default scan window are invisible), not an actual gap: `OX09` showed plant
+     `1001` genuinely has five (`0001`–`0005`). Setting `LIPS-LGORT = "0003"` (Finished)
+     resolved it — no config change needed at all.
+  2. "Delivery has not yet been put away / picked (completely)" — resolved by setting
+     `LIPSD-PIKMG` (picked quantity) equal to the delivery quantity on the item line.
+  3. A genuine fiscal-period lock: "Posting only possible in periods 2026/06 and
+     2026/05" (today, 2026/08, is closed for this company code). Resolved by setting
+     `LIKP-WADAT_IST` (Actual GI date) to a date inside the open period rather than
+     leaving it defaulted to today.
+  4. **Post Goods Issue then hit a genuine FI/CO account-determination gap**: "Account
+     determination for entry SKY1 GBB not possible" — material `103`'s valuation class
+     (`7920`) has no G/L account mapped for the `GBB` transaction key under whatever
+     "SKY1" resolves to at posting time.
+- **Tried a different material (97, valuation class `3000`, different from the broken
+  `7920`) as an alternative path** — this went *worse*: order creation surfaced a
+  missing "checking group" (availability check) on the material master, which cascades
+  into five separate missing schedule-line fields (Loading Date, Material Avail. Date,
+  Transportation Planning Date, Goods Issue Date, even the Shipping Point itself) in
+  the order's own Incompletion Log — VL01N refuses to deliver an incomplete order
+  outright. Abandoned this path as strictly messier than the material-103 blocker.
+- **Investigated the `SKY1` account-determination gap directly in `OBYC` (read-only,
+  no changes made or saved)**: found GP01's chart of accounts is `CANA`; the `GBB`
+  transaction's account table for `CANA` has real entries for valuation class `7920`
+  under a *blank* valuation-grouping code and under `0001` — nothing for `SKY1`
+  anywhere in the table (confirmed via SAP's own "Position" jump-to-value, which lands
+  on the next real entry when the searched value doesn't exist). Checked `T001K`
+  (valuation area → valuation grouping code): plant `1001`'s own `BWMOD` is *blank*,
+  not `SKY1` — and its company code is `USAG`, not `GP01` (the sales org's own company
+  code), an unexpected cross-company-code plant assignment. `SKY1` isn't traceable to
+  any master-data table checked — resolving it needs real FI/CO functional judgment
+  (how *this* valuation grouping is actually derived at posting time), not more
+  automated poking. Stopped here rather than guess at FI configuration blind; no OBYC
+  entries were added or changed.
+- **Status**: two real orders (`1979`, `1980`) and one real delivery (`80001138`) now
+  exist, all created live by the framework's own automation — a genuine first (no
+  delivery had ever been created before this investigation). Billing remains blocked
+  on the `SKY1`/`GBB` account-determination gap, which needs FI/CO specialist input to
+  resolve safely.

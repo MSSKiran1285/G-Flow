@@ -214,13 +214,37 @@ sandbox, not a framework gap (see notes below each story).
         popup** — proving the capability genuinely works. The popup lives entirely outside
         the SAP GUI Scripting object model (not a `wnd[N]`), which is exactly why no
         scripting-level gesture could ever have reached it.
-  - [ ] **Business blocker confirmed as a sandbox customizing defect, not a framework
-        gap.** The long text is standard boilerplate for message VL037 ("create an
-        individual delivery for the same sales order") — order 1979 has exactly one item,
-        so that's already what VL01N was asked to do; a fresh `read-table LIPS` confirms
-        no delivery exists. Needs SPRO access or functional SAP input to actually resolve,
-        which is outside what browser-driven automation can do — parked, not something to
-        keep guessing at.
+  - [x] **Shipping-point split actually resolved — no config change needed.** Reverse-
+        engineered a real historical O2C chain (invoice `90000006` → delivery `80000002`
+        → order `3`, via `VBRP`/`LIKP`/`LIPS`/`VBAK`/`VBAP` — explicitly *not* accepted
+        as E2E proof on its own, since reading pre-existing data isn't something the
+        framework demonstrated) to understand what a working combination looks like.
+        `TVSTZ` (Shipping Point Determination) showed the real proposed shipping point
+        for shipping condition `01` + loading group `0001` is `GP01`, not the `0001`
+        every historical delivery happened to use. Setting `LIKP-VSTEL = "GP01"` plus a
+        wider selection date took VL01N straight to the delivery-create screen — no
+        split, no log. **Saved real Outbound Delivery `80001138` for order `1979`, live,
+        via the framework's own automation** — the first delivery ever created in this
+        project.
+  - [ ] **Billing (VF01) now blocked on real, sequential O2C prerequisites, the last of
+        which is a genuine FI/CO gap.** In order: goods issue not yet posted → storage
+        location not set on the delivery item (fixed: `LIPS-LGORT = "0003"`; plant 1001
+        does have real storage locations, `read-table T001L` just missed them due to the
+        mining tool's lack of selection-screen filtering) → picking not confirmed (fixed:
+        set `LIPSD-PIKMG` = delivery qty) → a real fiscal-period lock (today, 2026/08, is
+        closed; fixed by setting `LIKP-WADAT_IST` into the open 2026/06 period) → **"Account
+        determination for entry SKY1 GBB not possible"** — material 103's valuation class
+        (7920) has no G/L account for `GBB` under whatever "SKY1" resolves to. Investigated
+        read-only in `OBYC` (chart of accounts `CANA`): confirmed `SKY1` has zero entries
+        anywhere in the `GBB` account table, and doesn't match plant 1001's own valuation
+        grouping code (`T001K.BWMOD` is blank) — its origin isn't traceable through the
+        master-data tables checked; plant 1001 also turned out to belong to company code
+        `USAG`, not `GP01` (the sales org's own), an unexpected cross-company assignment.
+        Tried material 97 (different valuation class) as an alternative — worse: it has a
+        missing availability-check group cascading into 5 incomplete schedule-line fields,
+        which VL01N refuses to deliver at all. Stopped rather than guess at FI/CO
+        configuration blind; no OBYC entries were added or changed. Needs FI/CO specialist
+        input to resolve.
 
 - **US-5.3** — As a tester, I need the statusbar's message-pattern registry (spec §5)
   to auto-extract known document-number patterns, not require a hand-written regex per
@@ -338,7 +362,7 @@ else works without real test data).
 | Phase | Focus | Epics | Status |
 |---|---|---|---|
 | 0 | Foundation: contract, agent, dynpro+ALV-read coverage, repository/engine MVP, data mining | 1, 2 (partial), 3 (partial), 4 (partial), 6 (partial) | ✅ Done |
-| **1** | **Chained business process**: buffers within and across TestCases, prove VA01→VL01N→VF01 end to end | 5 | 🟡 Engine + full ALV/coordinate-click stack done and proven live; live 3-step proof blocked on a confirmed sandbox customizing defect |
+| **1** | **Chained business process**: buffers within and across TestCases, prove VA01→VL01N→VF01 end to end | 5 | 🟡 Order + delivery live-created by the framework (a real first); billing blocked on an FI/CO account-determination gap needing specialist input |
 | 2 | Reporting: JSON/JUnit/HTML so results are usable outside a terminal | 7 | ⬜ |
 | 3 | Full component coverage: GuiTableControl (real scroll math, not row-0-only), ALV write ops, Tree/TextEdit/other shells | 2 | ⬜ |
 | 4 | Scanning maturity + self-healing: AI-enriched naming, review workflow, rescan/merge, locator healing | 3, 8 | ⬜ |
@@ -369,14 +393,33 @@ because the workstation screen was locked — a screenshot via the existing
 `CaptureScreenshot` RPC made that obvious immediately; SAP GUI Scripting works through a
 lock since it's COM, not OS input.)
 
-The long text itself turned out to be standard boilerplate for message VL037 ("create an
-individual delivery for the same sales order to ensure all items will be shipped") — not
-order-specific diagnostics. Order 1979 has exactly one item, so that's already what
-VL01N was asked to do, and a fresh `read-table LIPS` afterward confirms no delivery was
-created. **Conclusion: this is a genuine SAP customizing defect in this sandbox (shipping
-point / delivery grouping), not a framework gap** — closing it needs SPRO access or
-functional SAP input, not more UI automation. The framework side of Phase 1 (buffer
-engine + full ALV/coordinate-click coverage) is complete and live-proven; the live
-3-document chain itself is blocked on the sandbox, parked pending that input, with
-2 real E2E order-creation proofs (1978, 1979) and one real long-text read standing as
-the live evidence.
+The long text itself turned out to be standard boilerplate for message VL037, not
+order-specific diagnostics — but reverse-engineering a real historical chain (invoice
+`90000006` → delivery `80000002` → order `3`, explicitly *not* accepted as E2E proof on
+its own since reading pre-existing data isn't something the framework demonstrated)
+revealed the actual, real answer: `TVSTZ` (Shipping Point Determination) shows the true
+proposed shipping point for our order's shipping condition/loading group is `GP01`, not
+the `0001` every historical delivery happened to use. Setting `LIKP-VSTEL = "GP01"` plus
+widening VL01N's selection date resolved the split entirely — no config change needed.
+**Saved real Outbound Delivery `80001138` for order `1979`, live, via the framework's
+own automation — the first delivery ever created in this project.**
+
+Billing (VF01) then surfaced a sequence of genuine, ordinary O2C prerequisites, each
+fixed in turn: goods issue not posted → missing storage location (fixed: plant 1001 does
+have real ones, `0001`–`0005`; the earlier "zero storage locations" read was a gap in
+the mining tool, not the data) → picking not confirmed (fixed: set picked quantity) → a
+real fiscal-period lock, today's period being closed (fixed: posted into the open
+period). Post Goods Issue then hit a genuine FI/CO account-determination gap —
+"Account determination for entry SKY1 GBB not possible" — investigated read-only in
+`OBYC` but not traceable to any master-data table checked (plant 1001's own valuation
+grouping code is blank, not `SKY1`, and it turns out to belong to a different company
+code, `USAG`, than the sales org's own `GP01`). Tried an alternate material with a
+different valuation class — worse, cascading into 5 incomplete order fields via a
+missing availability-check group. Stopped rather than guess at FI/CO configuration
+blind; no config was changed anywhere in this investigation.
+
+**Net position**: the framework side of Phase 1 (buffer engine + full ALV/coordinate-
+click coverage) is complete and live-proven. Two real orders (1979, 1980) and one real
+delivery (80001138) now exist, all created live by the framework's own automation.
+Billing remains blocked on the SKY1/GBB account-determination gap, which needs FI/CO
+specialist input to resolve safely.
