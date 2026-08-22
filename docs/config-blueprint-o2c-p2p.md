@@ -1,10 +1,10 @@
 # Configuration Blueprint: New O2C + P2P Environment
 
-**Status: 📋 Blueprint — nothing in this document has been executed.** Per direct
-discussion, this is the design to review before any SPRO/config change is made live.
-Scope, approach, and depth were explicitly chosen: **build new** (not fix the existing
-GP01/1000/1001 setup), **blueprint first** (this document), **minimal viable** (just
-enough to prove one full O2C and one full P2P chain, not IDES-parity breadth).
+**Status: ✅ Finalized — verification checkpoints confirmed live, execution in
+progress.** Scope, approach, and depth were explicitly chosen: **build new** (not fix
+the existing GP01/1000/1001 setup), **blueprint first** (this document, reviewed before
+execution), **minimal viable** (just enough to prove one full O2C and one full P2P
+chain, not IDES-parity breadth).
 
 ## Why build new instead of fixing GP01/1000/1001
 
@@ -60,70 +60,80 @@ one shipping point, one storage location, one posting-period variant, one vendor
 the assignments wiring them together and extending one customer + one material into
 the new structure.
 
+## Verification checkpoints — confirmed live, read-only, before executing anything
+
+- **`SM01` is already taken as a company code** ("SM01 Private Limited") — the
+  originally proposed code had to change. **`MBT1`** (Model-Based Testing 1) is
+  confirmed free as a company code (`T001`), sales org (`TVKO`), plant (`T001W`), and
+  purchasing org (`T024E`).
+- **`GP01`'s own FI profile** (`T001`): country `US`, currency `USD`, fiscal year
+  variant `K4`, chart of accounts `CANA`.
+- **Tax procedure for country `US`** (`T005`): `USTAX1`. Only two tax codes exist under
+  it (`T007A`): `E1` ("US01 Input tax 10%") and **`E0`** (blank description — the
+  zero-rate placeholder to use for the minimal build). Whether `E0` is valid for both
+  sales (output) and purchasing (input) contexts will be confirmed live the first time
+  each transaction's own F4 help is checked, rather than assumed.
+- **Vendor reconciliation account**: existing vendors under `GP01` (`LFB1`) mostly use
+  `211000` — that's the account the new vendor will use.
+- **Material `103`**'s checking group (`MARC.MTVFP`) is `02`, loading group `LADGR` is
+  `0001` (consistent with everything else this session), and MRP type `DISMM` is `ND`
+  (not planned — pure sales test material, no MRP run needed). Item category group
+  (`MVKE.MTPOS`) is `NORM` (standard) — nothing exotic to carry over.
+- **Pricing procedure determination**: not resolved from `T683V` as originally assumed
+  — that table turned out to hold SD costing-sheet fields (`KALVG`/`KALKS`/`KALNB`),
+  not the pricing-procedure-determination table. Deferred to a live checkpoint during
+  O2C execution (`VA01` on the new sales area) rather than guessed from the wrong table.
+
 ## New objects to create
 
-| Object | Proposed code | Notes |
+| Object | Code | Notes |
 |---|---|---|
-| Company code | `SM01` | Assign chart of accounts `CANA`, currency `USD`, fiscal year variant `K4`. **Verify `SM01` is free before use** (`T001`) — not confirmed free, this is a proposal, not a reservation. |
-| Plant | `SM01` | Assign to company code `SM01`. Address can be a placeholder — doesn't feed legal control the way it did for the old plant `1000`, since we're not reusing a real-but-mislabeled address. |
-| Storage location | `0001` | Under plant `SM01`. Non-WM-managed (avoid plant `1000`'s `WMS1`-style complexity). |
-| Sales organization | `SM01` | Assign to company code `SM01`. |
-| Purchasing organization | `SM01` | Assign to company code `SM01`, and to plant `SM01` for plant-specific procurement. |
-| Shipping point | `SM01` | Dedicated 1:1 to plant `SM01` — deliberately not shared with any other plant, to structurally rule out the "delivery split" scenario that blocked Phase 1. |
-| Posting period variant | `SM01` (or reuse if an already-fully-open one exists — verify during execution) | Assigned only to company code `SM01`. All 12 periods open for the relevant fiscal year(s) — this directly avoids the "period 2026/08 closed" blocker hit in Phase 1. |
-| Vendor | one new vendor, e.g. `SM0001` | Created via `XK01`, purchasing org `SM01`, company code `SM01`. |
+| Company code | `MBT1` | Chart of accounts `CANA`, currency `USD`, fiscal year variant `K4`. |
+| Plant | `MBT1` | Assigned to company code `MBT1`. Address is a placeholder — doesn't feed legal control the way it did for the old plant `1000`, since we're not reusing a real-but-mislabeled address. |
+| Storage location | `0001` | Under plant `MBT1`. Non-WM-managed (avoid plant `1000`'s `WMS1`-style complexity). |
+| Sales organization | `MBT1` | Assigned to company code `MBT1`. |
+| Purchasing organization | `MBT1` | Assigned to company code `MBT1`, and to plant `MBT1` for plant-specific procurement. |
+| Shipping point | `MBT1` | Dedicated 1:1 to plant `MBT1` — deliberately not shared with any other plant, to structurally rule out the "delivery split" scenario that blocked Phase 1. |
+| Posting period variant | `MBT1` | Assigned only to company code `MBT1`. All 12 periods open for 2026 (and a buffer year either side) — this directly avoids the "period 2026/08 closed" blocker hit in Phase 1. |
+| Vendor | new, SAP-assigned or `MBT001` if external numbering is required | `XK01`, purchasing org `MBT1`, company code `MBT1`, reconciliation account `211000`. |
 
-## Assignments (the actual IMG work)
+## Assignments (the actual IMG work) — execution order
 
-In dependency order — each step needs the previous one to exist:
-
-1. **Define company code `SM01`** (`OX02`), assign chart of accounts `CANA`, currency
-   `USD`, fiscal year variant `K4` (`OB37`-family assignments).
-2. **Create posting period variant, assign to `SM01`, open all periods** (`OB29`/`OBBO`
-   family) — do this early; it's cheap and prevents rediscovering the fiscal-period
-   trap from Phase 1.
-3. **Define plant `SM01`** (`OX10`), assign to company code `SM01` (`OX18`).
-4. **Define storage location `0001`** under plant `SM01` (`OX09`).
-5. **Define valuation area = plant `SM01`**, set its valuation grouping code
-   (`T001K.BWMOD`) to **`0001`** explicitly (`OMWD`/`OMWN` — "Group Together Valuation
-   Areas" must be active and grouping code set, matching the code already proven to
-   have complete `BSX`/`GBB`/`WRX` coverage). **This is the single step that prevents
-   recreating the `SKY1` problem.**
-6. **Define sales organization `SM01`** (`OVX5`/`enterprise structure`), assign to
-   company code `SM01`, assign distribution channel `G1` and division `D1` to it, set
-   up the sales area `SM01`/`G1`/`D1`.
-7. **Assign plant `SM01` to sales org `SM01` + distribution channel `G1`** (plant/sales
-   area assignment — this is what lets `VA01` accept plant `SM01` as a delivering
-   plant for orders in this sales area).
-8. **Assign order type `OR` as permitted for sales area `SM01`/`G1`/`D1`.**
-9. **Create shipping point `SM01`**, assign it to plant `SM01`.
-10. **Add one shipping-point-determination entry** (`TVSTZ`/`OVL2`-family): shipping
-    condition `01` + loading group `0001` + plant `SM01` → shipping point `SM01`. One
-    row, one plant, one shipping point — no ambiguity possible.
-11. **Define purchasing organization `SM01`** (`OX08`), assign to company code `SM01`,
-    assign to plant `SM01` (plant-specific purchasing).
-12. **Assign pricing procedure for the new sales area**: copy the existing
-    `Doc.Pricing Proc` + `Cust.Pricing Proc` → `Procedure` entry already used by
-    `GP01`/`G1`/`D1` (verify the exact procedure name live — not yet confirmed which
-    one `GP01` uses) into a new entry for `SM01`/`G1`/`D1`.
-13. **Create vendor `SM0001`** (`XK01`) with purchasing org `SM01`, company code
-    `SM01`, reconciliation account matching whatever `CANA` uses for trade payables
-    (verify live).
-14. **Extend an existing, proven customer** (e.g. customer `2`, shipping condition
-    `01`, already used successfully in Phase 1) **to the new sales area**
-    `SM01`/`G1`/`D1` (`XD01`/`VD01` "extend to sales area").
-15. **Extend material `103`** (or copy it as a new material via `MM01` with reference)
-    **to plant `SM01`**: Sales/Plant view (assign storage location `0001`, delivery
-    plant), MRP view (verify checking group carries over from the reference), Accounting
-    view (valuation class `7920`, standard price or moving average — verify), Purchasing
-    view (needed for the P2P side).
+1. **Define company code `MBT1`** (`OX02`), assign chart of accounts `CANA`, currency
+   `USD`, fiscal year variant `K4`.
+2. **Create posting period variant `MBT1`, assign to company code `MBT1`, open all
+   periods** — done early; it's cheap and prevents rediscovering the fiscal-period trap.
+3. **Define plant `MBT1`** (`OX10`), assign to company code `MBT1` (`OX18`).
+4. **Define storage location `0001`** under plant `MBT1` (`OX09`).
+5. **Define valuation area = plant `MBT1`**, set its valuation grouping code
+   (`T001K.BWMOD`) to **`0001`** explicitly — the single step that prevents recreating
+   the `SKY1` problem.
+6. **Define sales organization `MBT1`**, assign to company code `MBT1`, assign
+   distribution channel `G1` and division `D1` to it, set up sales area
+   `MBT1`/`G1`/`D1`.
+7. **Assign plant `MBT1` to sales org `MBT1` + distribution channel `G1`.**
+8. **Assign order type `OR` as permitted for sales area `MBT1`/`G1`/`D1`.**
+9. **Create shipping point `MBT1`**, assign it to plant `MBT1`.
+10. **Add one shipping-point-determination entry**: shipping condition `01` + loading
+    group `0001` + plant `MBT1` → shipping point `MBT1`. One row, one plant, one
+    shipping point — no ambiguity possible.
+11. **Define purchasing organization `MBT1`** (`OX08`), assign to company code `MBT1`,
+    assign to plant `MBT1`.
+12. **Resolve and assign the pricing procedure for sales area `MBT1`/`G1`/`D1`** —
+    live checkpoint (see above), not yet a known value.
+13. **Create vendor** (`XK01`) with purchasing org `MBT1`, company code `MBT1`,
+    reconciliation account `211000`.
+14. **Extend customer `2`** (shipping condition `01`, already proven in Phase 1) **to
+    sales area `MBT1`/`G1`/`D1`.**
+15. **Extend material `103` to plant `MBT1`**: Sales/Plant view (storage location
+    `0001`), MRP view (checking group `02` should carry over), Accounting view
+    (valuation class `7920`), Purchasing view (needed for P2P).
 
 ## What this deliberately does NOT cover (minimal-viable scope)
 
-- **Tax**: use a zero-rate / no-tax code (e.g. `I0`/`O0`) if one already exists and is
-  usable without jurisdiction setup, sidestepping tax-procedure/jurisdiction
-  configuration entirely. Flagged explicitly — a real O2C/P2P build would need this,
-  but it's out of scope for "prove one chain works."
+- **Tax**: use zero-rate code `E0`, sidestepping tax-procedure/jurisdiction
+  configuration entirely. A real O2C/P2P build would need more than this, but it's out
+  of scope for "prove one chain works."
 - **Credit management**: assumed off / not blocking, since nothing in Phase 1 hit a
   credit check. Verify live in the first order-creation attempt; add a credit control
   area only if actually needed.
@@ -134,37 +144,27 @@ In dependency order — each step needs the previous one to exist:
 
 ## The two chains this unlocks
 
-**O2C**: `VA01` (order type `OR`, sales org `SM01`, plant `SM01`, customer `2`,
-material `103`) → `VL01N` (shipping point `SM01` auto-determines cleanly — one
+**O2C**: `VA01` (order type `OR`, sales org `MBT1`, plant `MBT1`, customer `2`,
+material `103`) → `VL01N` (shipping point `MBT1` auto-determines cleanly — one
 plant, one shipping point) → Post Goods Issue (storage location `0001` already
 assigned, checking group already present from the reference material, posting period
 already open) → `VF01` (billing — `BSX`/`GBB` account determination already resolves
 under grouping `0001`).
 
-**P2P**: `ME21N` (purchasing org `SM01`, plant `SM01`, vendor `SM0001`, material `103`)
+**P2P**: `ME21N` (purchasing org `MBT1`, plant `MBT1`, the new vendor, material `103`)
 → `MIGO` (goods receipt — `BSX` resolves under grouping `0001`) → `MIRO` (invoice
 verification — `WRX` clears against `211200`).
-
-## Verification checkpoints before executing
-
-A handful of facts this blueprint assumes but hasn't verified live — check these first,
-each is cheap (a `read-table`/`SE16N` lookup) and would change a proposed code or value
-if wrong:
-
-- `SM01` (and `SM0001`) are actually free/unused company-code, plant, sales-org,
-  purchasing-org, and vendor codes.
-- The exact pricing procedure `GP01`/`G1`/`D1` currently resolves to (to replicate for
-  `SM01`/`G1`/`D1`).
-- The reconciliation account `CANA` uses for trade payables (for the new vendor).
-- A usable zero-tax code exists and doesn't itself require jurisdiction data.
-- Material `103`'s current checking group and item category group, to confirm they
-  carry over cleanly when extended to a new plant.
 
 ## Rollback / blast-radius notes
 
 Every new object above is either brand new (safe — nothing else references it yet) or
 an *extension* of an existing customer/material to a new sales area/plant (additive —
 doesn't change that customer's or material's existing GP01/1000/1001 data). The one
-touch to shared config is step 5 (valuation area `SM01`'s own grouping code), which is
+touch to shared config is step 5 (valuation area `MBT1`'s own grouping code), which is
 scoped to the new plant only and doesn't alter any existing plant's grouping. Nothing
 in this blueprint modifies `GP01`, `1000`, `1001`, or any existing OBYC entry.
+
+## Execution log
+
+Filled in as each step is actually done live — see `docs/assumptions.md` for the
+detailed narrative (tcodes used, exact screens, any deviation from this plan).
