@@ -94,8 +94,19 @@ class TestStep(Base):
     # conditional completeness-check popup that only exists after Save is pressed.
     raw_component_id: Mapped[str] = mapped_column(String(500), default="")
     action_mode: Mapped[str] = mapped_column(String(30))  # matches ActionOp names, e.g. "SET", "PRESS"
+    # "literal" (binding_value used as-is) | "column" (names a TestSheet column) |
+    # "buffer" (names a value captured earlier in this run — see capture_* below).
     binding_type: Mapped[str] = mapped_column(String(10), default="literal")
     binding_value: Mapped[str] = mapped_column(String(300), default="")
     optional: Mapped[bool] = mapped_column(default=False)  # skip (don't fail) if the component isn't found
+
+    # Buffers (spec §6 `Buffer` ActionMode): capture this step's outcome into a named
+    # value other steps — in this TestCase or a later one in a chain — can bind to via
+    # binding_type "buffer". capture_from "actual_value" stores the step's own
+    # ActionResult.actual_value (e.g. a READ); "statusbar" re-reads the statusbar right
+    # after this step and applies a registered regex (see smt/engine/message_patterns.py).
+    capture_buffer_key: Mapped[str] = mapped_column(String(100), default="")
+    capture_from: Mapped[str] = mapped_column(String(20), default="actual_value")
+    capture_pattern: Mapped[str] = mapped_column(String(100), default="")
 
     test_case: Mapped[TestCase] = relationship(back_populates="steps")

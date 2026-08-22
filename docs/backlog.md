@@ -14,7 +14,7 @@ answerable from `git log`/`git diff` on this file, not from memory.
 | 2 | Universal Component Coverage | 🟡 Partial | 0 → 3 |
 | 3 | Screen Scanning & Repository | 🟡 Partial | 0 → 4 |
 | 4 | Test Authoring & Data-Driven Execution | 🟡 Partial | 0 → 1 |
-| 5 | Chained Business Processes (Buffers) | ⬜ Not started | **1 (recommended next)** |
+| 5 | Chained Business Processes (Buffers) | 🟡 Partial | **1 (in progress)** |
 | 6 | Master Data Mining & Test Data Generation | 🟡 Partial | 0 → 5 |
 | 7 | Reporting & CI Integration | ⬜ Not started | 2 |
 | 8 | Self-Healing Locators | ⬜ Not started | 4 |
@@ -153,7 +153,8 @@ no buffers/recovery, no reporting.
 - **US-4.4** — A tester can chain buffered values between steps within one TestCase
   (spec §6 `Buffer` ActionMode) — e.g. capture the created order number for use in a
   later step or a later TestCase.
-  - [ ] Not started. See Epic 5 — this is the concrete next increment.
+  - [x] Done as part of Epic 5 — see US-5.1/US-5.2 for the actual capability and its
+        live-testing status.
 
 - **US-4.5** — Recovery scenarios (`on E-message → retry`, `on unexpected modal →
   screenshot + handler chain`, `on session loss → relogon + restart`) per spec §6.
@@ -161,36 +162,49 @@ no buffers/recovery, no reporting.
 
 ---
 
-## Epic 5 — Chained Business Processes (Buffers) — *recommended next*
+## Epic 5 — Chained Business Processes (Buffers)
 
 **Goal:** Prove the framework handles a real business *process*, not just one document
 — the thing that actually differentiates this from a single-screen record/replay tool.
 
-**Status: ⬜ Not started**
+**Status: 🟡 Partial** — the engine capability is built and unit-tested; the live
+VA01 → VL01N → VF01 chain is blocked on a real SAP master-data/customizing issue in this
+sandbox, not a framework gap (see notes below each story).
 
 - **US-5.1** — As a tester, I need a step's result (e.g. the created order number
   parsed from the statusbar) to be captured into a named buffer usable by later steps.
-  - [ ] `TestStep` gains a `capture_to_buffer` option; engine maintains a per-run buffer
-        dict, threaded through step execution
-  - [ ] Binding type `buffer:<name>` resolves from that dict, alongside `literal:`/`column:`
-  - AC: a step's `binding_type: buffer` step correctly substitutes a value captured by
-    an earlier step in the *same* run
+  - [x] `TestStep` gains `capture_buffer_key` / `capture_from` / `capture_pattern`;
+        `smt/engine/executor.py` maintains a per-run buffer dict threaded through step execution
+  - [x] Binding type `buffer:<name>` resolves from that dict, alongside `literal:`/`column:`
+        (`smt/engine/message_patterns.py` supplies the regex extraction)
+  - [x] Unit-tested: capture from `actual_value` and from a statusbar pattern; a mismatched
+        pattern fails the row with a clear message instead of silently continuing
 
 - **US-5.2** — As a tester, I need buffered values to survive across TestCases in a
   chain (VA01 → VL01N → VF01), not just within one.
-  - [ ] `run_test_case` (or a new `run_chain`) accepts a list of (TestCase, TestSheet)
-        pairs and threads one buffer dict through all of them
-  - AC: order number created by VA01 is the exact value used by VL01N to create the
-    delivery, and that delivery number is the exact value VF01 bills against — all
-    three real documents independently verifiable afterward (VA03/VL03N/VF03)
+  - [x] `run_chain()` + `smt run-chain` run several TestCases per data row sharing one
+        buffer, stopping a row's chain at the first failing TestCase
+  - [x] Unit-tested: a value captured by one TestCase is correctly bound by the next;
+        a failure in the first TestCase stops the chain before the second ever opens a session
+  - [ ] **Live 3-step proof blocked, not by the engine** — creating a *fresh* order that's
+        immediately deliverable hit two real, since-fixed master-data quirks (a missing PO
+        number, and plant `1000` being mislabeled "Std Plant US" but configured with
+        country `GB`, which a material export/legal-control check rejects — switching to
+        plant `1001`, genuinely US, fixed order creation: order 1978 saved cleanly on the
+        first attempt). VL01N then hit a live "delivery split because of different shipping
+        points" info-log for plant 1001 that never proceeds to an actual delivery — reading
+        its long text needs `GRID_DOUBLE_CLICK_CELL`/row-select on ALV grids, which Epic 2
+        hasn't built yet (M2 gap, tracked there). Stopped digging further rather than keep
+        guessing this sandbox's shipping-point customizing blind.
 
 - **US-5.3** — As a tester, I need the statusbar's message-pattern registry (spec §5)
   to auto-extract known document-number patterns, not require a hand-written regex per
   TestCase.
-  - [ ] A small registry of known SAP message patterns (`Standard Order (\d+) has been
-        saved` → order number, etc.) usable as a built-in buffer-capture source
-  - AC: at least the 3 message patterns needed for VA01/VL01N/VF01 are registered and
-    correctly extract their document numbers live
+  - [x] Registry with `order_saved`, `delivery_saved`, `billing_saved` (`smt/engine/message_patterns.py`)
+  - [x] `order_saved` confirmed live (orders 1976/1977/1978, all real "Standard Order N has
+        been saved" statusbar text extracted correctly)
+  - [ ] `delivery_saved` / `billing_saved` still `VERIFY-ON-TARGET` — no delivery has
+        actually been created yet to confirm the real wording against (see US-5.2)
 
 ---
 
@@ -215,8 +229,11 @@ reusable "test data generation" service, no pairwise/boundary generation.
   actually go together.
   - [x] `smt read-table` (SE16N via the new ALV grid support) — confirmed live against
         VBAK/VBAP; this is what actually unblocked the order-1975/1976/1977 E2E proof
-  - [ ] Not yet extended to LIKP/LIPS (deliveries), VBRK/VBRP (invoices), EKKO/EKPO
-        (purchase orders) — mechanism is proven generic, just not exercised there yet
+  - [x] Extended to LIKP/LIPS (deliveries) and T001W (plant master) while chasing the
+        Epic 5 live chain — real historical delivery data (shipping point `0001`) and a
+        real plant-master data quality issue (plant `1000` labeled "US", configured `GB`)
+        both surfaced this way
+  - [ ] VBRK/VBRP (invoices), EKKO/EKPO (purchase orders) — not yet exercised
 
 - **US-6.3** — Pairwise/boundary/equivalence-class test data generation from a Module's
   attribute domains (spec §9).
@@ -296,7 +313,7 @@ else works without real test data).
 | Phase | Focus | Epics | Status |
 |---|---|---|---|
 | 0 | Foundation: contract, agent, dynpro+ALV-read coverage, repository/engine MVP, data mining | 1, 2 (partial), 3 (partial), 4 (partial), 6 (partial) | ✅ Done |
-| **1** | **Chained business process**: buffers within and across TestCases, prove VA01→VL01N→VF01 end to end | 5 | ⬜ Next up |
+| **1** | **Chained business process**: buffers within and across TestCases, prove VA01→VL01N→VF01 end to end | 5 | 🟡 Engine done, live 3-step proof blocked on Epic 2 (ALV double-click/row-select) |
 | 2 | Reporting: JSON/JUnit/HTML so results are usable outside a terminal | 7 | ⬜ |
 | 3 | Full component coverage: GuiTableControl (real scroll math, not row-0-only), ALV write ops, Tree/TextEdit/other shells | 2 | ⬜ |
 | 4 | Scanning maturity + self-healing: AI-enriched naming, review workflow, rescan/merge, locator healing | 3, 8 | ⬜ |
@@ -304,9 +321,14 @@ else works without real test data).
 | 6 | AI services: NL authoring, failure triage, risk-based selection (needs an LLM provider decision first) | 10 | ⬜ |
 | 7 | Web front end | 11 | ⬜ |
 
-**Immediate recommendation (Phase 1, Epic 5):** implement buffer capture + cross-TestCase
-chaining, then prove it with a real VA01 → VL01N → VF01 run — same discipline as the
-order-1975/1976/1977 proof, extended to a full process instead of one document. This is
-the smallest change that meaningfully differentiates the framework from a single-screen
-record/replay tool, and it reuses everything built in Phase 0 rather than opening new
-surface area.
+**Phase 1 status:** the engine half is done — buffer capture, the message-pattern
+registry, and `run_chain` cross-TestCase chaining are all built and unit-tested (27
+passing tests). The live 3-step proof surfaced two real, now-fixed order-creation gaps
+(missing PO number; plant `1000` mislabeled "US" but configured `GB`, which a material
+export/legal-control check correctly rejected — plant `1001` fixed it, order 1978 saved
+cleanly). It then hit a live VL01N "delivery split because of different shipping points"
+info-log that never proceeds to an actual delivery; reading its long text needs
+`GRID_DOUBLE_CLICK_CELL`/row-select on ALV grids, which Epic 2 doesn't have yet. Decision
+point: either build that small ALV slice next (unblocks this directly) or accept the
+engine-level proof as sufficient for now and revisit once Phase 3 (full component
+coverage) lands anyway.

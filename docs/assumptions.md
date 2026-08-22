@@ -201,3 +201,51 @@ Per spec §13, recorded here rather than re-confirmed inline.
   event/callback, since GuiSession doesn't expose a push-based statusbar-changed event
   through scripting. Acceptable for M1; revisit if polling proves too slow against a
   real system.
+
+## Phase 1 (backlog Epic 5): buffers, chaining, and a live VA01 → VL01N → VF01 attempt
+
+- **Engine built and unit-tested first, then taken live** (same discipline as before):
+  `smt/engine/executor.py` gained `capture_buffer_key`/`capture_from`/`capture_pattern`
+  on `TestStep`, a `binding_type: "buffer"` resolved from a per-run dict, and
+  `run_chain()` (+ `smt run-chain`) threading one buffer across several TestCases,
+  stopping a row's chain at the first failure. `smt/engine/message_patterns.py` holds
+  the statusbar regex registry (spec §5). 27 tests pass, including a `FakeAgent` that
+  scripts statusbar text across multiple STATUSBAR_READ calls to exercise chaining.
+- **Live chain hit two real, now-fixed order-creation gaps** before ever reaching
+  VL01N:
+  1. A fresh order without a customer PO number saves fine (as orders 1976/1977 already
+     proved) but is flagged incomplete, and an incomplete order can't be delivered
+     (VL01N: "Order is incomplete — maintain the order", confirmed by reading VL01N's
+     own error log via `AlvGridHandler`/`GRID_GET_CELL` — the same ALV read path proved
+     for SE16N works identically for an arbitrary error-log grid). Fix: fill
+     `wnd[0]/usr/subSUBSCREEN_HEADER:SAPMV45A:4021/txtVBKD-BSTKD` (PO number) — not
+     under `ssubHEADER_FRAME:SAPMV45A:4440` as an earlier guess assumed.
+  2. Completing the item still requires an explicit Plant (`ctxtVBAP-WERKS[12,0]` on the
+     item table). Setting it to `1000` (the plant every historical order/delivery in
+     this sandbox actually uses, confirmed via `read-table VBAP/LIPS`) triggered `Material
+     N is not defined for sales from United Kingdom` — for *two different* materials, so
+     it isn't a material-specific gap. `read-table T001W WERKS NAME1 LAND1` showed why:
+     plant `1000` is named "Std Plant US" but configured with `LAND1 = GB`. This is a
+     genuine data-quality issue in the sandbox's plant master, not something scanning or
+     replay caused — most likely this sandbox's demo data was bulk-loaded (LSMW/BAPI)
+     without ever passing through the interactive determination logic that would catch
+     it. Switching to plant `1001` (correctly `US`) fixed order creation outright — order
+     1978 saved cleanly on the very first attempt, no incompleteness popup at all.
+- **VL01N then hit a real, still-unresolved blocker**: creating a delivery for order
+  1978 produces an *information*-level log, "Item 000010: delivery split because of
+  different shipping points" (not an error), and the transaction just sits on the
+  generic log-display screen (`SAPLSBAL_DISPLAY`) rather than proceeding to an actual
+  delivery document — tried both an explicit shipping point (`0001`, the real value
+  every historical delivery uses per `read-table LIKP`) and leaving it blank for
+  auto-determination; same result either way. Reading the log entry's long text (which
+  would very likely explain the real fix) needs `GRID_DOUBLE_CLICK_CELL` or row
+  selection on the ALV grid — neither is implemented (`AlvGridHandler` is read-only:
+  `RowCount`/`Columns`/`GRID_GET_CELL` only, per Epic 2's current scope). Stopped here
+  rather than keep guessing this sandbox's shipping-point customizing blind — a
+  reasonable-effort stopping point, revisit once Epic 2 grows ALV double-click/selection
+  support (would also directly unblock reading *any* ALV error log's long text, not just
+  this one).
+- **Net effect on the backlog**: US-5.1 and the engine half of US-5.2 are done and
+  tested; the live 3-real-document chain (US-5.2's last checkbox) and confirming
+  `delivery_saved`/`billing_saved` against real wording (US-5.3's last checkbox) are
+  blocked on the Epic 2 ALV gap above, not on anything in Epic 5 itself.

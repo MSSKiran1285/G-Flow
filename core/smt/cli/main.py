@@ -173,6 +173,39 @@ def run_testcase_cmd(
         typer.echo(f"row {r.row_index} [{status}]: {r.message}")
 
 
+@app.command("run-chain")
+def run_chain_cmd(
+    step: list[str] = typer.Option(..., "--step", help="TestCaseName:sheet.csv, repeatable, in chain order"),
+    target: str = typer.Option("localhost:50051", help="SapGuiAgent gRPC target"),
+) -> None:
+    """Run several TestCases in sequence per data row, sharing one buffer per row across
+    all of them — e.g. VA01 -> VL01N -> VF01, where the order number VA01 creates feeds
+    VL01N, and the delivery number VL01N creates feeds VF01."""
+    from smt.engine.executor import run_chain
+    from smt.repository.db import make_engine, make_session_factory
+
+    chain = []
+    for entry in step:
+        name, _, sheet_path = entry.partition(":")
+        if not sheet_path:
+            raise typer.BadParameter(f"expected 'TestCaseName:sheet.csv', got {entry!r}")
+        chain.append((name, Path(sheet_path)))
+
+    session_factory = make_session_factory(make_engine())
+
+    with UiAgentClient(target) as agent:
+        connection = agent.list_connections().connections[0]
+        all_results = run_chain(agent, session_factory, chain, connection.connection_id)
+
+    for row_index, row in enumerate(all_results):
+        typer.echo(f"row {row_index}:")
+        for r in row:
+            status = "PASS" if r.success else f"FAIL (step {r.failed_at_step})"
+            typer.echo(f"  {r.test_case_name} [{status}]: {r.message}")
+        if row:
+            typer.echo(f"  buffer: {row[-1].buffer}")
+
+
 @app.command("run-steps")
 def run_steps(
     yaml_path: Path = typer.Argument(..., help="YAML file with `session` + `steps`"),

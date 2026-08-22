@@ -16,12 +16,19 @@ everything confirmed (or found broken) against a real system.
   GuiTableControl and ALV write ops are still unimplemented.
 - `core/` (Python): `UiAgentPort` seam + real gRPC client + `FakeUiAgent` (fixture
   replay); a SQLite repository (`Module`/`ModuleAttribute`/`TestCase`/`TestStep`) and a
-  deterministic execution engine that resolves bindings against a CSV TestSheet; F4-based
-  and table-based (SE16N) master-data mining; a Typer CLI (`smt ...`) tying it together.
+  deterministic execution engine that resolves bindings (literal/column/**buffer**)
+  against a CSV TestSheet, with a statusbar message-pattern registry for capturing
+  document numbers and `run_chain` for threading a buffer across several TestCases;
+  F4-based and table-based (SE16N) master-data mining; a Typer CLI (`smt ...`) tying it
+  together.
 - **Proven end-to-end against a live system**: scanned two real screens as Modules,
   assembled a data-driven TestCase from them (no hardcoded component ids), ran it
   against two different, historically-mined data rows, and got back two independently
-  verified, real saved sales orders. Full narrative in `docs/assumptions.md`.
+  verified, real saved sales orders. The buffer/chaining engine itself is built and
+  unit-tested; the live 3-document VA01→VL01N→VF01 chain surfaced two real order-data
+  gaps (now fixed) before hitting a VL01N blocker that needs an ALV grid capability
+  (`GRID_DOUBLE_CLICK_CELL`) this framework doesn't have yet. Full narrative in
+  `docs/assumptions.md`.
 
 ## Build & test
 
@@ -78,6 +85,13 @@ smt define-testcase core/examples/va01_create_order_testcase.yaml
 smt run-testcase VA01_CreateStandardOrder --sheet core/examples/va01_create_order_data.csv
 ```
 
+**Chain several TestCases with a shared buffer** (e.g. an order number created by one
+feeding a delivery created by the next):
+
+```
+smt run-chain --step "OrderCase:orders.csv" --step "DeliveryCase:deliveries.csv"
+```
+
 This is CLI/config-driven, not a graphical front end — no React/FastAPI UI exists yet
 (`core/api/`, `core/ui/` are still empty). See `docs/assumptions.md` for that scoping
 discussion.
@@ -85,11 +99,14 @@ discussion.
 ## Known gaps
 
 - GuiTableControl and ALV *write* ops (SET, toolbar/context-menu, checkbox/button
-  cells) — read-only ALV support exists, nothing else in the §5 GuiShell matrix does.
+  cells) — read-only ALV support exists (`RowCount`/`Columns`/`GRID_GET_CELL`), nothing
+  else in the §5 GuiShell matrix does. `GRID_DOUBLE_CLICK_CELL` and row selection are a
+  concrete, real blocker right now — reading an ALV error log's long text needs them.
   Trees, text-edit shells, other shells — all still unimplemented.
 - Self-healing (`ResolveLocator`) — not started.
 - No web UI, no FastAPI backend, no AI services, no business-process modeling.
-- Recovery scenarios (retry/relogon), buffers across chained test cases, reporting
-  (HTML/JUnit) — engine MVP doesn't have these yet.
+- Recovery scenarios (retry/relogon), reporting (HTML/JUnit) — engine MVP doesn't have
+  these yet. Buffers + chaining across TestCases exist (`run_chain`) but the live
+  3-document proof is currently blocked (see Status above).
 - Many COM member names are marked `VERIFY-ON-TARGET` in `agent/SapGuiAgent/Com` and
   `Components` — some are now confirmed live (see assumptions doc), most aren't yet.
