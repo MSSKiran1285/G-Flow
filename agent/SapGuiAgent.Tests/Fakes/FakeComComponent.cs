@@ -47,6 +47,10 @@ public sealed class FakeGridViewNative
 {
     public int RowCount { get; set; }
     public int VisibleRowCount { get; set; }
+    public int ScreenLeft { get; set; }
+    public int ScreenTop { get; set; }
+    public int Width { get; set; }
+    public int Height { get; set; }
     public FakeStringCollection ColumnOrder { get; } = new();
     public int FirstVisibleRow { get; set; }
     public string SelectedRows { get; set; } = "";

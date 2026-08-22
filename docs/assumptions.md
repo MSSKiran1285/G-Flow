@@ -298,6 +298,54 @@ Per spec §13, recorded here rather than re-confirmed inline.
   `mouse_event`, not a SAP GUI Scripting call at all. That's a genuinely new
   capability (P/Invoke into user32.dll) rather than a quick fix, so it's a scope
   decision, not something to build silently mid-investigation.
+- **Built `COORDINATE_CLICK_FALLBACK` and it genuinely works — closing the framework
+  gap, even though the business blocker itself turned out to be a dead end.** Added
+  `Native/MouseInput.cs` (`SetCursorPos` + legacy `mouse_event`, chosen over
+  `SendInput` since `GuiVComponent.ScreenLeft/Top` are the same absolute-pixel space
+  `ScreenshotService` already uses via `Graphics.CopyFromScreen` — no virtual-desktop
+  normalization needed) and wired it into `ComponentHandlerBase.ExecuteAsync` as a
+  universal op gated on `request.allow_fragile_fallback` (43 C# tests, using a
+  swappable `MouseInput.Click` delegate so tests don't move the real cursor).
+  - **First live attempt did nothing — root cause was the workstation screen being
+    locked**, not a bug: SAP GUI Scripting calls reach the SAP process over COM
+    regardless of lock state, but `SetCursorPos`/`mouse_event` land on the secure lock
+    desktop, not the real one. A screenshot (via the existing `CaptureScreenshot` RPC)
+    made this immediately visible. This also means the earlier scripting-level
+    double-click/current-cell attempts were never affected by the lock (COM, not OS
+    input) — only the coordinate fallback was.
+  - **After the user unlocked the workstation, a screenshot of the log grid revealed
+    a distinct clickable icon** (`%_ICON_LNG`, an orange "?" glyph) rather than a
+    guessable text region. Double-clicking that icon's exact screen coordinate (via
+    `COORDINATE_CLICK_FALLBACK` with `extra.x_offset`/`y_offset`) **opened SAP's real
+    "Performance Assistant" long-text popup** — message VL037's full diagnosis: "Item
+    000010 cannot be shipped in the same delivery with the other items in the document
+    because the shipping point is different... If this message appears when creating
+    an outbound delivery for a sales order, you have to create an individual delivery
+    for the same sales order to ensure all items will be shipped." This confirms the
+    capability itself is real and working — the popup lives entirely outside the SAP
+    GUI Scripting object model (not a `wnd[N]` in the session tree), which explains why
+    every earlier scripting-level gesture correctly reached the grid's API surface but
+    never triggered this popup: it isn't reachable through scripting at all, only
+    through a genuine OS click.
+  - **The message's own text is standard boilerplate for VL037, not order-specific
+    diagnostics, and its "fix" doesn't apply**: order 1979 has exactly one item, so
+    "create an individual delivery for the same sales order" describes exactly what
+    VL01N was already asked to do. Re-checked `LIPS` immediately after (fresh
+    `read-table` against real, non-stale data) — still no delivery exists for order
+    1979. This rules out "just needed to accept the message and it already worked" and
+    confirms the block is a genuine shipping-point-determination customizing defect in
+    this sandbox, not something reachable through further UI automation.
+  - **Incident during this investigation, handled safely**: after the long-text popup
+    (which lives outside the scripting tree and has its own close button), a follow-up
+    coordinate click aimed at that popup's close X — issued after the popup had likely
+    already closed on its own — landed on the underlying SAP window's own title-bar
+    close button instead, triggering a native "Log Off — unsaved data will be lost"
+    confirmation dialog. Found via `scan_screen(root_id="wnd[1]")` (the default scan
+    root is `wnd[0]` only, so the dialog was invisible until explicitly requested) and
+    dismissed with `PRESS` on `btnSPOP-OPTION2` ("No") — session recovered with no data
+    lost. Lesson: a coordinate click aimed at a non-scripting popup should be
+    re-verified (screenshot or scan) before firing a second blind click at the same
+    spot, since the target may have already closed.
 - **Net effect on the backlog**: US-5.1 and the engine half of US-5.2 are done and
   tested; the ALV double-click/select gap that used to block the last checkbox is now
   closed. The live 3-real-document chain (US-5.2's last checkbox) and confirming

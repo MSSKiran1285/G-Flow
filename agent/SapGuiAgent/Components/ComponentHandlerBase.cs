@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using SapGuiAgent.Com;
 using SapGuiAgent.Grpc;
+using SapGuiAgent.Native;
 
 namespace SapGuiAgent.Components;
 
@@ -35,6 +36,38 @@ public abstract class ComponentHandlerBase : IComponentHandler
             {
                 new ComHandle(component.Native).Call("SetFocus");
                 return new ActionResult { Success = true, ElapsedMs = stopwatch.ElapsedMilliseconds };
+            }
+
+            // Last resort (spec §11): a real OS-level mouse click at the component's screen
+            // coordinates, for controls that don't honor the equivalent scripting-API call
+            // (found live: SAPLSBAL_DISPLAY's log-viewer ALV grid answers GetCellValue and
+            // RowCount fine but ignores DoubleClick/SetCurrentCell — no scripting gesture
+            // opens its long text). Gated on allow_fragile_fallback since it's a real click
+            // on whatever is at those screen coordinates, not a scoped API call, and always
+            // reports Fragile=true so callers know to treat the result skeptically.
+            if (request.Op == ActionOp.CoordinateClickFallback)
+            {
+                if (!request.AllowFragileFallback)
+                {
+                    return new ActionResult
+                    {
+                        Success = false,
+                        ErrorMessage = "COORDINATE_CLICK_FALLBACK requires allow_fragile_fallback=true",
+                        ElapsedMs = stopwatch.ElapsedMilliseconds,
+                    };
+                }
+
+                var native = new ComHandle(component.Native);
+                var left = ComHandle.TryGet(() => native.GetInt("ScreenLeft"), 0);
+                var top = ComHandle.TryGet(() => native.GetInt("ScreenTop"), 0);
+                var width = ComHandle.TryGet(() => native.GetInt("Width"), 0);
+                var height = ComHandle.TryGet(() => native.GetInt("Height"), 0);
+                var extra = request.Params.Extra;
+                var xOffset = extra.TryGetValue("x_offset", out var xs) && int.TryParse(xs, out var xv) ? xv : width / 2;
+                var yOffset = extra.TryGetValue("y_offset", out var ys) && int.TryParse(ys, out var yv) ? yv : height / 2;
+                var clickCount = extra.TryGetValue("click_count", out var cs) && int.TryParse(cs, out var cv) ? cv : 2;
+                MouseInput.Click(left + xOffset, top + yOffset, clickCount);
+                return new ActionResult { Success = true, Fragile = true, ElapsedMs = stopwatch.ElapsedMilliseconds };
             }
 
             var result = await ExecuteCoreAsync(component, request, ct);

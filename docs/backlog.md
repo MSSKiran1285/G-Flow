@@ -200,16 +200,27 @@ sandbox, not a framework gap (see notes below each story).
         real "Long Text (F5)" toolbar button once the grid's cursor (not just
         `SelectedRows`) was set on the row — none open the long text, even though
         `%_ICON_LNG` confirms one exists and `GetCellValue`/`RowCount` reads work fine on
-        the same grid. Every SAP GUI Scripting-level gesture for this is exhausted; the one
-        remaining option is `COORDINATE_CLICK_FALLBACK` (in the proto already) — a real
-        OS-level mouse click via Win32, not a scripting call, and a genuinely new capability
-        rather than a quick fix. Also confirmed no delivery was silently created anyway
-        (`read-table LIPS` real data ends at `80000006`), and ruled out a plant-level
-        shipping-point mismatch (`T001W.VSTEL` = `'0001'` for both plants `1000`/`1001`).
-        Remaining blocker is either a sandbox customizing question (delivery grouping /
-        route / item category, needs SPRO access or functional SAP input) or an
-        OS-level-click capability build — stopped for a decision rather than guessing
-        further or building new infrastructure unprompted.
+        the same grid. Every SAP GUI Scripting-level gesture for this is exhausted. Also
+        confirmed no delivery was silently created anyway (`read-table LIPS` real data ends
+        at `80000006`), and ruled out a plant-level shipping-point mismatch
+        (`T001W.VSTEL` = `'0001'` for both plants `1000`/`1001`).
+  - [x] **`COORDINATE_CLICK_FALLBACK` built and proven live** — `Native/MouseInput.cs`
+        (Win32 `SetCursorPos`/`mouse_event`), wired as a universal op on
+        `ComponentHandlerBase` gated by `allow_fragile_fallback` (43 C# tests). First live
+        attempt did nothing because the workstation screen was locked — SAP GUI Scripting
+        (COM) works through a lock, OS-level mouse input doesn't, confirmed via a
+        screenshot. After unlocking, double-clicking the log grid's `%_ICON_LNG` icon at
+        its exact screen coordinate **opened SAP's real "Performance Assistant" long-text
+        popup** — proving the capability genuinely works. The popup lives entirely outside
+        the SAP GUI Scripting object model (not a `wnd[N]`), which is exactly why no
+        scripting-level gesture could ever have reached it.
+  - [ ] **Business blocker confirmed as a sandbox customizing defect, not a framework
+        gap.** The long text is standard boilerplate for message VL037 ("create an
+        individual delivery for the same sales order") — order 1979 has exactly one item,
+        so that's already what VL01N was asked to do; a fresh `read-table LIPS` confirms
+        no delivery exists. Needs SPRO access or functional SAP input to actually resolve,
+        which is outside what browser-driven automation can do — parked, not something to
+        keep guessing at.
 
 - **US-5.3** — As a tester, I need the statusbar's message-pattern registry (spec §5)
   to auto-extract known document-number patterns, not require a hand-written regex per
@@ -327,7 +338,7 @@ else works without real test data).
 | Phase | Focus | Epics | Status |
 |---|---|---|---|
 | 0 | Foundation: contract, agent, dynpro+ALV-read coverage, repository/engine MVP, data mining | 1, 2 (partial), 3 (partial), 4 (partial), 6 (partial) | ✅ Done |
-| **1** | **Chained business process**: buffers within and across TestCases, prove VA01→VL01N→VF01 end to end | 5 | 🟡 Engine + ALV double-click/select/current-cell done, live 3-step proof blocked — every scripting-level gesture for the log's long text is exhausted |
+| **1** | **Chained business process**: buffers within and across TestCases, prove VA01→VL01N→VF01 end to end | 5 | 🟡 Engine + full ALV/coordinate-click stack done and proven live; live 3-step proof blocked on a confirmed sandbox customizing defect |
 | 2 | Reporting: JSON/JUnit/HTML so results are usable outside a terminal | 7 | ⬜ |
 | 3 | Full component coverage: GuiTableControl (real scroll math, not row-0-only), ALV write ops, Tree/TextEdit/other shells | 2 | ⬜ |
 | 4 | Scanning maturity + self-healing: AI-enriched naming, review workflow, rescan/merge, locator healing | 3, 8 | ⬜ |
@@ -343,14 +354,29 @@ export/legal-control check correctly rejected — plant `1001` fixed it, order 1
 cleanly). It then hit a live VL01N "delivery split because of different shipping points"
 info-log that never proceeds to an actual delivery, and a second fresh order with a
 different customer/material reproduced the identical split — confirming it's systemic
-to the sandbox, not order-specific. Built `GRID_DOUBLE_CLICK_CELL`, `GRID_SELECT_ROWS`,
-and `GRID_CURRENT_CELL` on `AlvGridHandler` (41 C# tests) and tried every scripting-level
-gesture for reading that log entry's long text, including the real "Long Text" toolbar
-button with the grid cursor properly set — none open it, though a long text demonstrably
-exists (`%_ICON_LNG` confirms it) and the same grid's other reads work fine. Also ruled
-out a plant-level shipping-point mismatch via table reads. What's left: either sandbox
-customizing (needs SPRO access or functional SAP input) or building a genuinely new
-OS-level mouse-click capability (`COORDINATE_CLICK_FALLBACK` via Win32, already named in
-the proto but unbuilt) — a real scope decision, not a quick fix. Needs a decision on
-which to pursue, or whether to accept the engine-level proof as sufficient for now and
-move to a different phase.
+to the sandbox, not order-specific.
+
+Built the full ALV/coordinate-click stack chasing this log entry's long text:
+`GRID_DOUBLE_CLICK_CELL`, `GRID_SELECT_ROWS`, `GRID_CURRENT_CELL` (41 C# tests) — none
+of the scripting-level gestures opened it, even with the toolbar "Long Text" button and
+the grid cursor properly set. Then built `COORDINATE_CLICK_FALLBACK` (Win32
+`SetCursorPos`/`mouse_event`, 43 C# tests) as the last resort, and **it worked**:
+double-clicking the log row's `%_ICON_LNG` icon at its exact screen coordinate opened
+SAP's real "Performance Assistant" long-text popup — a genuine capability win, and it
+explains the whole chase: that popup lives entirely outside the SAP GUI Scripting object
+model, so no scripting gesture could ever have reached it. (First attempt did nothing
+because the workstation screen was locked — a screenshot via the existing
+`CaptureScreenshot` RPC made that obvious immediately; SAP GUI Scripting works through a
+lock since it's COM, not OS input.)
+
+The long text itself turned out to be standard boilerplate for message VL037 ("create an
+individual delivery for the same sales order to ensure all items will be shipped") — not
+order-specific diagnostics. Order 1979 has exactly one item, so that's already what
+VL01N was asked to do, and a fresh `read-table LIPS` afterward confirms no delivery was
+created. **Conclusion: this is a genuine SAP customizing defect in this sandbox (shipping
+point / delivery grouping), not a framework gap** — closing it needs SPRO access or
+functional SAP input, not more UI automation. The framework side of Phase 1 (buffer
+engine + full ALV/coordinate-click coverage) is complete and live-proven; the live
+3-document chain itself is blocked on the sandbox, parked pending that input, with
+2 real E2E order-creation proofs (1978, 1979) and one real long-text read standing as
+the live evidence.

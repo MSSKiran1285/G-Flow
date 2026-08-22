@@ -1,6 +1,7 @@
 using System.Linq;
 using SapGuiAgent.Components;
 using SapGuiAgent.Grpc;
+using SapGuiAgent.Native;
 using SapGuiAgent.Tests.Fakes;
 using Xunit;
 
@@ -114,6 +115,55 @@ public class AlvGridHandlerTests
 
         Assert.True(result.Success);
         Assert.Equal("", native.SelectedRows);
+    }
+
+    [Fact]
+    public async Task CoordinateClickFallback_without_allow_fragile_fails_cleanly()
+    {
+        var native = new FakeGridViewNative { ScreenLeft = 100, ScreenTop = 200, Width = 40, Height = 20 };
+        var component = BuildGrid(native);
+        var clicks = new List<(int X, int Y, int Count)>();
+        var original = MouseInput.Click;
+        MouseInput.Click = (x, y, n) => clicks.Add((x, y, n));
+        try
+        {
+            var result = await new AlvGridHandler().ExecuteAsync(
+                component,
+                new ActionRequest { ComponentId = component.Id, Op = ActionOp.CoordinateClickFallback, AllowFragileFallback = false },
+                CancellationToken.None);
+
+            Assert.False(result.Success);
+            Assert.Empty(clicks);
+        }
+        finally
+        {
+            MouseInput.Click = original;
+        }
+    }
+
+    [Fact]
+    public async Task CoordinateClickFallback_with_allow_fragile_clicks_the_component_center()
+    {
+        var native = new FakeGridViewNative { ScreenLeft = 100, ScreenTop = 200, Width = 40, Height = 20 };
+        var component = BuildGrid(native);
+        var clicks = new List<(int X, int Y, int Count)>();
+        var original = MouseInput.Click;
+        MouseInput.Click = (x, y, n) => clicks.Add((x, y, n));
+        try
+        {
+            var result = await new AlvGridHandler().ExecuteAsync(
+                component,
+                new ActionRequest { ComponentId = component.Id, Op = ActionOp.CoordinateClickFallback, AllowFragileFallback = true },
+                CancellationToken.None);
+
+            Assert.True(result.Success);
+            Assert.True(result.Fragile);
+            Assert.Equal((120, 210, 2), Assert.Single(clicks));
+        }
+        finally
+        {
+            MouseInput.Click = original;
+        }
     }
 
     [Fact]
