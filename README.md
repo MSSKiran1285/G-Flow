@@ -10,8 +10,11 @@ everything confirmed (or found broken) against a real system.
 - `proto/uiadapter.proto`: full gRPC contract (session lifecycle, scan, replay,
   self-healing, events, screenshots).
 - `agent/` (C# .NET 8 `SapGuiAgent`): dynpro-family scan/replay, statusbar events,
-  screenshots, allowlist guardrail, and read-only ALV grid support (`GuiShell/GridView`
-  — row/column metadata + cell reads). COM access goes through `Com/ComHandle.cs`
+  screenshots, allowlist guardrail, and ALV grid support (`GuiShell/GridView` —
+  row/column metadata, cell reads, double-click, row select, current-cell/cursor) plus
+  `COORDINATE_CLICK_FALLBACK` — a real OS-level mouse click (Win32) for the rare control
+  that doesn't honor the scripting-API equivalent, gated behind `allow_fragile_fallback`
+  and always reported `fragile`. COM access goes through `Com/ComHandle.cs`
   (`Type.InvokeMember`), not C#'s `dynamic` keyword — see assumptions doc for why.
   GuiTableControl and ALV write ops are still unimplemented.
 - `core/` (Python): `UiAgentPort` seam + real gRPC client + `FakeUiAgent` (fixture
@@ -23,12 +26,15 @@ everything confirmed (or found broken) against a real system.
   together.
 - **Proven end-to-end against a live system**: scanned two real screens as Modules,
   assembled a data-driven TestCase from them (no hardcoded component ids), ran it
-  against two different, historically-mined data rows, and got back two independently
+  against several different, historically-mined data rows, and got back independently
   verified, real saved sales orders. The buffer/chaining engine itself is built and
   unit-tested; the live 3-document VA01→VL01N→VF01 chain surfaced two real order-data
-  gaps (now fixed) before hitting a VL01N blocker that needs an ALV grid capability
-  (`GRID_DOUBLE_CLICK_CELL`) this framework doesn't have yet. Full narrative in
-  `docs/assumptions.md`.
+  gaps (now fixed) before hitting a VL01N "delivery split" blocker. Every ALV
+  double-click/select/current-cell gesture and finally `COORDINATE_CLICK_FALLBACK`
+  (a real OS click) were built and tried live against it — the fallback genuinely works
+  (it opened SAP's own long-text popup for the message), which confirmed the block is a
+  real shipping-point-determination customizing defect in this sandbox, not a framework
+  gap. Full narrative in `docs/assumptions.md`.
 
 ## Build & test
 
@@ -98,15 +104,14 @@ discussion.
 
 ## Known gaps
 
-- GuiTableControl and ALV *write* ops (SET, toolbar/context-menu, checkbox/button
-  cells) — read-only ALV support exists (`RowCount`/`Columns`/`GRID_GET_CELL`), nothing
-  else in the §5 GuiShell matrix does. `GRID_DOUBLE_CLICK_CELL` and row selection are a
-  concrete, real blocker right now — reading an ALV error log's long text needs them.
-  Trees, text-edit shells, other shells — all still unimplemented.
+- GuiTableControl and ALV *write* ops beyond what's built (toolbar/context-menu,
+  checkbox/button cells) — reads, double-click, row-select, and current-cell all exist
+  now. Trees, text-edit shells, other shells — all still unimplemented.
 - Self-healing (`ResolveLocator`) — not started.
 - No web UI, no FastAPI backend, no AI services, no business-process modeling.
 - Recovery scenarios (retry/relogon), reporting (HTML/JUnit) — engine MVP doesn't have
   these yet. Buffers + chaining across TestCases exist (`run_chain`) but the live
-  3-document proof is currently blocked (see Status above).
+  3-document proof is currently blocked on a sandbox customizing defect, not the
+  framework (see Status above).
 - Many COM member names are marked `VERIFY-ON-TARGET` in `agent/SapGuiAgent/Com` and
   `Components` — some are now confirmed live (see assumptions doc), most aren't yet.
