@@ -271,6 +271,33 @@ Per spec §13, recorded here rather than re-confirmed inline.
   and no functional SAP consulting input — not something browser-driven automation can
   shortcut. Stopping here and flagging for a decision rather than continuing to guess
   blind.
+- **Confirmed the split is systemic, not order-1978-specific, then exhausted every
+  scripting-level gesture for reading its long text.** Created a second fresh order
+  (1979 — different customer `3`, material `103`, same plant `1001`) end to end; it
+  saved cleanly on the first attempt (no incompleteness popup), same as 1978. VL01N
+  produced the *exact same* "Item 000010: delivery split because of different shipping
+  points" log entry — ruling out "something specific to order 1978" as the cause.
+  Confirmed via the ALV grid itself: `%_ICON_LNG` on that row reads
+  `"@35\QLong text exists@"`, so a long text genuinely exists; the question is purely
+  how to open it through scripting. Found and tried the real toolbar button for it
+  (`wnd[0]/tbar[1]/btn[5]`, tooltip "Long Text (F5)") — but it (like everything else)
+  requires the grid's *cursor* on the row, which is a different thing from
+  `SelectedRows` (checkbox-style multi-select). Built `GRID_CURRENT_CELL` on
+  `AlvGridHandler` (`GuiGridView.SetCurrentCell(row, columnId)`, 41 C# tests) to set
+  it. Live: the call succeeds with no COM error, but the statusbar still reads "Choose
+  a message in the list with the cursor" afterward, and pressing the Long Text button
+  still does nothing — so `SetCurrentCell` isn't actually registering as a real
+  cursor move on this particular custom control (`SAPLSBAL_DISPLAY`'s business
+  application log viewer), even though the same grid answers `GetCellValue` and
+  `RowCount`/`ColumnOrder` reads correctly. Every semantic scripting-API gesture
+  available (`DoubleClick` on two columns, `SelectedRows`, `SetCurrentCell`, the real
+  toolbar button, `SEND_VKEY F5`) has now been tried and none opens this control's
+  long text. The one remaining avenue is `COORDINATE_CLICK_FALLBACK` (already in
+  `uiadapter.proto` as a designed-for-exactly-this escape hatch) — a real OS-level
+  mouse click at the component's screen coordinates via Win32 `SendInput`/
+  `mouse_event`, not a SAP GUI Scripting call at all. That's a genuinely new
+  capability (P/Invoke into user32.dll) rather than a quick fix, so it's a scope
+  decision, not something to build silently mid-investigation.
 - **Net effect on the backlog**: US-5.1 and the engine half of US-5.2 are done and
   tested; the ALV double-click/select gap that used to block the last checkbox is now
   closed. The live 3-real-document chain (US-5.2's last checkbox) and confirming

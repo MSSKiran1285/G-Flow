@@ -68,6 +68,21 @@ public class AlvGridHandlerTests
     }
 
     [Fact]
+    public async Task GridCurrentCell_moves_the_grid_cursor_to_the_requested_cell()
+    {
+        var native = new FakeGridViewNative();
+        var component = BuildGrid(native);
+
+        var result = await new AlvGridHandler().ExecuteAsync(
+            component,
+            new ActionRequest { ComponentId = component.Id, Op = ActionOp.GridCurrentCell, Params = new ActionParams { Row = 0, ColumnId = "T_MSG" } },
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal((0, "T_MSG"), Assert.Single(native.CurrentCellSets));
+    }
+
+    [Fact]
     public async Task GridSelectRows_sets_SelectedRows_as_a_comma_joined_list()
     {
         var native = new FakeGridViewNative();

@@ -52,6 +52,14 @@ public sealed class AlvGridHandler : ComponentHandlerBase, IAlvGridHandler
             case ActionOp.GridSetScrollRow:
                 native.Set("FirstVisibleRow", request.Params.Row); // VERIFY-ON-TARGET
                 return Task.FromResult(new ActionResult { Success = true });
+            case ActionOp.GridCurrentCell:
+                // VERIFY-ON-TARGET: GuiGridView.SetCurrentCell(row, columnId) — moves the
+                // grid's cursor. Distinct from SelectedRows (checkbox-style multi-select):
+                // toolbar actions like "Long Text" act on the current cell, not on
+                // SelectedRows, so a row marked selected without also being the current
+                // cell won't respond to them (found live on SAPLSBAL_DISPLAY's log grid).
+                native.Call("SetCurrentCell", request.Params.Row, request.Params.ColumnId);
+                return Task.FromResult(new ActionResult { Success = true });
             case ActionOp.GridDoubleClickCell:
                 // VERIFY-ON-TARGET: GuiGridView.DoubleClick(row, columnId) — the standard
                 // way to open a cell's long text / drill down, e.g. an error log's message.

@@ -193,16 +193,23 @@ sandbox, not a framework gap (see notes below each story).
         plant `1001`, genuinely US, fixed order creation: order 1978 saved cleanly on the
         first attempt). VL01N then hit a live "delivery split because of different shipping
         points" info-log for plant 1001 that never proceeds to an actual delivery.
-        `GRID_DOUBLE_CLICK_CELL`/`GRID_SELECT_ROWS` were since built on `AlvGridHandler`
-        (40 C# tests) specifically to read this log entry's long text — live testing found
-        neither double-click (on `T_MSG` or `%_ICON_LNG`) nor row-select+F5 opens the
-        long-text popup on this particular log screen. Confirmed no delivery was silently
-        created anyway (`read-table LIPS` shows real data ends at delivery `80000006`, well
-        short of order 1978). Checked `T001W.VSTEL` for plants `1000`/`1001` — both `'0001'`,
-        so it isn't a plant-level shipping-point mismatch either. This is now a genuine
-        sandbox shipping-point-determination customizing question (delivery grouping /
-        route / item category), not an ALV-reading gap — stopped rather than guess SPRO
-        customizing blind with no functional SAP input.
+        A second fresh order (1979, different customer/material, same plant) reproduced the
+        *identical* split — this is systemic to the sandbox, not order-1978-specific.
+        `GRID_DOUBLE_CLICK_CELL`, `GRID_SELECT_ROWS`, and `GRID_CURRENT_CELL` were all built
+        on `AlvGridHandler` (41 C# tests) and tried live against this log entry, plus the
+        real "Long Text (F5)" toolbar button once the grid's cursor (not just
+        `SelectedRows`) was set on the row — none open the long text, even though
+        `%_ICON_LNG` confirms one exists and `GetCellValue`/`RowCount` reads work fine on
+        the same grid. Every SAP GUI Scripting-level gesture for this is exhausted; the one
+        remaining option is `COORDINATE_CLICK_FALLBACK` (in the proto already) — a real
+        OS-level mouse click via Win32, not a scripting call, and a genuinely new capability
+        rather than a quick fix. Also confirmed no delivery was silently created anyway
+        (`read-table LIPS` real data ends at `80000006`), and ruled out a plant-level
+        shipping-point mismatch (`T001W.VSTEL` = `'0001'` for both plants `1000`/`1001`).
+        Remaining blocker is either a sandbox customizing question (delivery grouping /
+        route / item category, needs SPRO access or functional SAP input) or an
+        OS-level-click capability build — stopped for a decision rather than guessing
+        further or building new infrastructure unprompted.
 
 - **US-5.3** — As a tester, I need the statusbar's message-pattern registry (spec §5)
   to auto-extract known document-number patterns, not require a hand-written regex per
@@ -320,7 +327,7 @@ else works without real test data).
 | Phase | Focus | Epics | Status |
 |---|---|---|---|
 | 0 | Foundation: contract, agent, dynpro+ALV-read coverage, repository/engine MVP, data mining | 1, 2 (partial), 3 (partial), 4 (partial), 6 (partial) | ✅ Done |
-| **1** | **Chained business process**: buffers within and across TestCases, prove VA01→VL01N→VF01 end to end | 5 | 🟡 Engine + ALV double-click/select done, live 3-step proof blocked on sandbox shipping-point customizing |
+| **1** | **Chained business process**: buffers within and across TestCases, prove VA01→VL01N→VF01 end to end | 5 | 🟡 Engine + ALV double-click/select/current-cell done, live 3-step proof blocked — every scripting-level gesture for the log's long text is exhausted |
 | 2 | Reporting: JSON/JUnit/HTML so results are usable outside a terminal | 7 | ⬜ |
 | 3 | Full component coverage: GuiTableControl (real scroll math, not row-0-only), ALV write ops, Tree/TextEdit/other shells | 2 | ⬜ |
 | 4 | Scanning maturity + self-healing: AI-enriched naming, review workflow, rescan/merge, locator healing | 3, 8 | ⬜ |
@@ -334,13 +341,16 @@ passing tests). The live 3-step proof surfaced two real, now-fixed order-creatio
 (missing PO number; plant `1000` mislabeled "US" but configured `GB`, which a material
 export/legal-control check correctly rejected — plant `1001` fixed it, order 1978 saved
 cleanly). It then hit a live VL01N "delivery split because of different shipping points"
-info-log that never proceeds to an actual delivery. Built `GRID_DOUBLE_CLICK_CELL` and
-`GRID_SELECT_ROWS` on `AlvGridHandler` (40 C# tests) specifically to read that log
-entry's long text — neither opens it on this log screen, no delivery was silently
-created, and the plants involved share the same default shipping point, ruling out the
-one cheap customizing lead available via table reads. This is now a sandbox
-shipping-point-determination customizing question, not a framework gap the codebase can
-close — needs a decision on whether to keep investigating this specific blocker (would
-need SPRO access or functional SAP input neither available here), try a different
-order/customer/route combination on the chance it's data-specific rather than systemic,
-or accept the engine-level proof as sufficient for now and move to a different phase.
+info-log that never proceeds to an actual delivery, and a second fresh order with a
+different customer/material reproduced the identical split — confirming it's systemic
+to the sandbox, not order-specific. Built `GRID_DOUBLE_CLICK_CELL`, `GRID_SELECT_ROWS`,
+and `GRID_CURRENT_CELL` on `AlvGridHandler` (41 C# tests) and tried every scripting-level
+gesture for reading that log entry's long text, including the real "Long Text" toolbar
+button with the grid cursor properly set — none open it, though a long text demonstrably
+exists (`%_ICON_LNG` confirms it) and the same grid's other reads work fine. Also ruled
+out a plant-level shipping-point mismatch via table reads. What's left: either sandbox
+customizing (needs SPRO access or functional SAP input) or building a genuinely new
+OS-level mouse-click capability (`COORDINATE_CLICK_FALLBACK` via Win32, already named in
+the proto but unbuilt) — a real scope decision, not a quick fix. Needs a decision on
+which to pursue, or whether to accept the engine-level proof as sufficient for now and
+move to a different phase.
