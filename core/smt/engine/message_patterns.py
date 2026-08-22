@@ -2,10 +2,14 @@
 auto-extracts created document numbers into buffers"), so a TestCase author references a
 pattern by name instead of hand-writing a regex per document type.
 
-Patterns for delivery/billing are carried over from the order-save wording confirmed live
-(spec §5's convention: "<Document type> <number> has been saved") but haven't themselves
-been confirmed against a real VL01N/VF01 save yet — treat them as VERIFY-ON-TARGET until
-a live chain run confirms or corrects them, same discipline as the agent's own COM calls.
+`billing_saved` is carried over from the order-save wording convention but hasn't itself
+been confirmed against a real VF01 save yet (billing remains blocked on a live FI/CO
+account-determination gap — see docs/assumptions.md) — treat it as VERIFY-ON-TARGET.
+`delivery_saved` IS confirmed live: real VL01N wording is "Outbound Delivery 80001138 has
+been saved", not just "Delivery N has been saved" as originally guessed — the existing
+regex still matches correctly since `re.search` finds "Delivery 80001138 has been saved"
+as a substring, but the leading "Outbound " means an exact-match regex would have missed
+it, worth keeping in mind for any future pattern here.
 """
 
 from __future__ import annotations
@@ -15,7 +19,7 @@ import re
 # name -> (regex, capture group index)
 PATTERNS: dict[str, tuple[str, int]] = {
     "order_saved": (r"Standard Order (\d+) has been saved", 1),
-    "delivery_saved": (r"Delivery (\d+) has been saved", 1),  # VERIFY-ON-TARGET
+    "delivery_saved": (r"Delivery (\d+) has been saved", 1),
     "billing_saved": (r"Billing document (\d+) has been saved", 1),  # VERIFY-ON-TARGET
 }
 

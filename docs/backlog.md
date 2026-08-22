@@ -252,8 +252,11 @@ sandbox, not a framework gap (see notes below each story).
   - [x] Registry with `order_saved`, `delivery_saved`, `billing_saved` (`smt/engine/message_patterns.py`)
   - [x] `order_saved` confirmed live (orders 1976/1977/1978, all real "Standard Order N has
         been saved" statusbar text extracted correctly)
-  - [ ] `delivery_saved` / `billing_saved` still `VERIFY-ON-TARGET` — no delivery has
-        actually been created yet to confirm the real wording against (see US-5.2)
+  - [x] `delivery_saved` confirmed live against real delivery 80001138 — actual wording is
+        "Outbound Delivery N has been saved" (not just "Delivery N..." as originally
+        guessed); the existing regex still matches correctly via substring search
+  - [ ] `billing_saved` still `VERIFY-ON-TARGET` — billing is blocked on a real FI/CO
+        account-determination gap (see US-5.2), so no real wording to confirm against yet
 
 ---
 
