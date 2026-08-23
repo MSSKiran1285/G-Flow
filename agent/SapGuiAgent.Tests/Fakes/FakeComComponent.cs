@@ -61,6 +61,8 @@ public sealed class FakeGridViewNative
     public string GetCellValue(int row, string columnId) =>
         Cells.TryGetValue((row, columnId), out var value) ? value : "";
 
+    public void ModifyCell(int row, string columnId, string value) => Cells[(row, columnId)] = value;
+
     public void DoubleClick(int row, string columnId) => DoubleClicks.Add((row, columnId));
     public void SetCurrentCell(int row, string columnId) => CurrentCellSets.Add((row, columnId));
 }

@@ -421,3 +421,56 @@ Per spec §13, recorded here rather than re-confirmed inline.
   delivery had ever been created before this investigation). Billing remains blocked
   on the `SKY1`/`GBB` account-determination gap, which needs FI/CO specialist input to
   resolve safely.
+
+## Phase 2: reversed the "build new" decision, fixed GP01/1000/1001 directly, full O2C proof
+
+- **User-directed pivot**: rather than continue building the new `MBT1` environment
+  (`docs/config-blueprint-o2c-p2p.md`), the user asked directly why not just build the
+  master-data/config needed on the existing, already-far-along `GP01`/`1000`/`1001`
+  setup instead. Chosen explicitly (`AskUserQuestion`): **"Reuse Phase 1's GP01/1000
+  setup"**. The blueprint document's `MBT1` plan is marked superseded rather than
+  deleted (see its own status note); a partial `MBT1` plant rebuild done before the
+  pivot was left in place, inert, rather than torn down.
+- **OBYC transaction-key drill-down is not automatable via SAP GUI Scripting on this
+  system — confirmed exhaustively, again.** Every scripted double-click/`TABLE_FIND_ROW`
+  /checkbox-click gesture into a transaction key's detail screen failed silently, even
+  for fully visible rows — consistent with the Phase 1 finding on `SAPLSBAL_DISPLAY`'s
+  log grid (some custom controls' drill-in gestures simply aren't reachable through the
+  scripting object model). **Resolved by asking the user to do the one drill-in click
+  manually**, then taking over immediately for everything else (menu navigation between
+  a key's Rules/Accounts sub-screens via `Goto` *is* scriptable and worked reliably once
+  positioned on the key). This happened twice in the session (once for the initial
+  `GBB`/`SKY1` navigation, once to add a second account-determination row) — each time,
+  a short manual hand-off plus automated follow-through was faster than continuing to
+  fight the drill-in gesture.
+- **Real, sequential customizing gaps found and fixed, in order** (all via live table
+  reads before deciding a value — see `docs/o2c-config-fixes.md` for full detail, this
+  is the compressed version):
+  1. `OBYC`: `T030` had zero entries for `KTOPL=SKY1, KTOSL=GBB`. Determined the correct
+     account (`12003`) by reading `SKY1`'s own chart of accounts (`SKAT`) rather than
+     guessing — a small, ad hoc test COA where every existing account name literally
+     described its OBYC purpose (`BSX`→`12007` "Input tax-BSX", `WRX`→`12004` "Input
+     tax", `PRD`→`12008` "Input tax-PRD"), and `12003` ("Expense Account") was the one
+     matching, unused account, confirmed as a P&L account already created at
+     `USAG` company-code level. **First attempt used the wrong modifier** (`KOMOK=ZOB`,
+     guessed by analogy from `CANA`'s working `GBB`/`ZOB` entries) — PGI's own error
+     then named the real modifier needed (`VAX`) directly, so a second entry was added
+     rather than second-guessing the first live error.
+  2. `FBN1`: number-range object `RF_BELEG`, interval `49`, didn't exist for company
+     code `USAG` (existing: `02`,`03`,`15`,`17`,`19`,`50`,`51`). Added `0000000700`–
+     `0000000799` for fiscal year 2026, matching the existing small-block pattern.
+  3. `FTXP`: tax code `A0` didn't exist under procedure `USTAX1` at all (only `E0`/`E1`
+     did) — found not from a blocked-document list (`VFX3` came back empty, since this
+     wasn't flagged as a "blocked" document via the usual status) but by manually
+     invoking `Billing document → ReleaseToAccounting` on the saved-but-unposted billing
+     document, which surfaces the underlying exception directly. Fixed by creating `A0`
+     as an exact structural mirror of `E0` (same tax type, same account keys, same 0%
+     rate) — no new G/L accounts needed since `E0`'s existing accounts covered it.
+- **First real FI accounting document this project has ever produced**: after all
+  three fixes, `VF02 → ReleaseToAccounting` on billing doc `90001003` succeeded
+  (`VBRK.RFBSK` blank → `'C'`), and `BKPF` shows a real linked document (`100000017`,
+  FY2026, type `RV`, `AWTYP='VBRK'`, `AWKEY='0090001003'`) — confirmed via direct table
+  read, not just the absence of an error message. Combined with the already-proven PGI
+  (`VBUK.WBSTK='C'`), this closes out the full O2C chain (order → delivery → goods issue
+  → billing → FI posting) live, on the existing environment, with no new company
+  code/plant needed after all.

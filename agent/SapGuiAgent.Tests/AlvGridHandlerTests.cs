@@ -54,6 +54,23 @@ public class AlvGridHandlerTests
     }
 
     [Fact]
+    public async Task GridSetCell_modifies_the_cell_and_returns_the_new_value()
+    {
+        var native = new FakeGridViewNative();
+        native.Cells[(0, "BUKRS")] = "GP01";
+        var component = BuildGrid(native);
+
+        var result = await new AlvGridHandler().ExecuteAsync(
+            component,
+            new ActionRequest { ComponentId = component.Id, Op = ActionOp.GridSetCell, Params = new ActionParams { Row = 0, ColumnId = "BUKRS", TextValue = "MBT1" } },
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal("MBT1", result.ActualValue);
+        Assert.Equal("MBT1", native.Cells[(0, "BUKRS")]);
+    }
+
+    [Fact]
     public async Task GridDoubleClickCell_double_clicks_the_requested_cell()
     {
         var native = new FakeGridViewNative();

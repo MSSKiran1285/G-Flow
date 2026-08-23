@@ -167,9 +167,12 @@ no buffers/recovery, no reporting.
 **Goal:** Prove the framework handles a real business *process*, not just one document
 — the thing that actually differentiates this from a single-screen record/replay tool.
 
-**Status: 🟡 Partial** — the engine capability is built and unit-tested; the live
-VA01 → VL01N → VF01 chain is blocked on a real SAP master-data/customizing issue in this
-sandbox, not a framework gap (see notes below each story).
+**Status: ✅ Done** — the engine capability is built and unit-tested, and the live
+`VA01 → VL01N → VF01` chain (order → delivery → goods issue → billing → FI posting) is
+now proven fully end-to-end on the existing `GP01`/`1000`/`1001` environment. Getting
+there required fixing three real customizing gaps (`OBYC` account determination,
+`FBN1` number range, `FTXP` tax code) rather than building a new environment — see
+`docs/o2c-config-fixes.md`.
 
 - **US-5.1** — As a tester, I need a step's result (e.g. the created order number
   parsed from the statusbar) to be captured into a named buffer usable by later steps.
@@ -226,25 +229,35 @@ sandbox, not a framework gap (see notes below each story).
         split, no log. **Saved real Outbound Delivery `80001138` for order `1979`, live,
         via the framework's own automation** — the first delivery ever created in this
         project.
-  - [ ] **Billing (VF01) now blocked on real, sequential O2C prerequisites, the last of
-        which is a genuine FI/CO gap.** In order: goods issue not yet posted → storage
+  - [x] **Billing (VF01) blocker resolved — three real, sequential customizing gaps,
+        all fixed live.** After the prerequisites below (storage location, picking,
+        fiscal period — all fixed as originally found), Post Goods Issue hit **"Account
+        determination for entry SKY1 GBB not possible"**. Rather than build a new
+        company code/plant (the path this section originally recommended), the user
+        chose to reuse the existing `GP01`/`1000`/`1001` environment and fix the real
+        gaps directly:
+        1. `OBYC`: `T030` had zero `SKY1`/`GBB` entries at all — added two (`KOMOK=VAX`
+           and `KOMOK=ZOB`, both → account `12003`, found by reading `SKY1`'s own chart
+           of accounts rather than guessing).
+        2. `FBN1`: number-range interval `49` didn't exist for company code `USAG` —
+           added it.
+        3. `FTXP`: tax code `A0` didn't exist under procedure `USTAX1` — created it as
+           a structural mirror of the existing `E0`.
+        Full detail in `docs/o2c-config-fixes.md`. **Live proof**: PGI completed
+        (`VBUK.WBSTK='C'`), billing document `90001003` saved, and — after the tax-code
+        fix — `ReleaseToAccounting` produced a real FI document (`BKPF` `100000017`,
+        `AWTYP='VBRK'`, `AWKEY='0090001003'`). This is the first real accounting
+        document this project's automation has produced.
+        (Original blocker notes, for history: goods issue not yet posted → storage
         location not set on the delivery item (fixed: `LIPS-LGORT = "0003"`; plant 1001
         does have real storage locations, `read-table T001L` just missed them due to the
         mining tool's lack of selection-screen filtering) → picking not confirmed (fixed:
         set `LIPSD-PIKMG` = delivery qty) → a real fiscal-period lock (today, 2026/08, is
-        closed; fixed by setting `LIKP-WADAT_IST` into the open 2026/06 period) → **"Account
-        determination for entry SKY1 GBB not possible"** — material 103's valuation class
-        (7920) has no G/L account for `GBB` under whatever "SKY1" resolves to. Investigated
-        read-only in `OBYC` (chart of accounts `CANA`): confirmed `SKY1` has zero entries
-        anywhere in the `GBB` account table, and doesn't match plant 1001's own valuation
-        grouping code (`T001K.BWMOD` is blank) — its origin isn't traceable through the
-        master-data tables checked; plant 1001 also turned out to belong to company code
-        `USAG`, not `GP01` (the sales org's own), an unexpected cross-company assignment.
-        Tried material 97 (different valuation class) as an alternative — worse: it has a
-        missing availability-check group cascading into 5 incomplete schedule-line fields,
-        which VL01N refuses to deliver at all. Stopped rather than guess at FI/CO
-        configuration blind; no OBYC entries were added or changed. Needs FI/CO specialist
-        input to resolve.
+        closed; fixed by setting `LIKP-WADAT_IST` into the open 2026/06 period). Tried
+        material 97 (different valuation class) as an alternative early on — worse: it
+        has a missing availability-check group cascading into 5 incomplete schedule-line
+        fields, which VL01N refuses to deliver at all; abandoned in favor of the
+        material-103 path above.)
 
 - **US-5.3** — As a tester, I need the statusbar's message-pattern registry (spec §5)
   to auto-extract known document-number patterns, not require a hand-written regex per
@@ -255,8 +268,8 @@ sandbox, not a framework gap (see notes below each story).
   - [x] `delivery_saved` confirmed live against real delivery 80001138 — actual wording is
         "Outbound Delivery N has been saved" (not just "Delivery N..." as originally
         guessed); the existing regex still matches correctly via substring search
-  - [ ] `billing_saved` still `VERIFY-ON-TARGET` — billing is blocked on a real FI/CO
-        account-determination gap (see US-5.2), so no real wording to confirm against yet
+  - [x] `billing_saved` confirmed live against real billing document `90001003` — see
+        US-5.2 for the full fix chain that unblocked it
 
 ---
 
@@ -365,7 +378,7 @@ else works without real test data).
 | Phase | Focus | Epics | Status |
 |---|---|---|---|
 | 0 | Foundation: contract, agent, dynpro+ALV-read coverage, repository/engine MVP, data mining | 1, 2 (partial), 3 (partial), 4 (partial), 6 (partial) | ✅ Done |
-| **1** | **Chained business process**: buffers within and across TestCases, prove VA01→VL01N→VF01 end to end | 5 | 🟡 Order + delivery live-created by the framework (a real first); billing blocked on an FI/CO account-determination gap needing specialist input |
+| **1** | **Chained business process**: buffers within and across TestCases, prove VA01→VL01N→VF01 end to end | 5 | ✅ Order, delivery, goods issue, billing, and a real FI accounting document all live-created by the framework — full O2C chain proven |
 | 2 | Reporting: JSON/JUnit/HTML so results are usable outside a terminal | 7 | ⬜ |
 | 3 | Full component coverage: GuiTableControl (real scroll math, not row-0-only), ALV write ops, Tree/TextEdit/other shells | 2 | ⬜ |
 | 4 | Scanning maturity + self-healing: AI-enriched naming, review workflow, rescan/merge, locator healing | 3, 8 | ⬜ |
@@ -413,16 +426,19 @@ have real ones, `0001`–`0005`; the earlier "zero storage locations" read was a
 the mining tool, not the data) → picking not confirmed (fixed: set picked quantity) → a
 real fiscal-period lock, today's period being closed (fixed: posted into the open
 period). Post Goods Issue then hit a genuine FI/CO account-determination gap —
-"Account determination for entry SKY1 GBB not possible" — investigated read-only in
-`OBYC` but not traceable to any master-data table checked (plant 1001's own valuation
-grouping code is blank, not `SKY1`, and it turns out to belong to a different company
-code, `USAG`, than the sales org's own `GP01`). Tried an alternate material with a
-different valuation class — worse, cascading into 5 incomplete order fields via a
-missing availability-check group. Stopped rather than guess at FI/CO configuration
-blind; no config was changed anywhere in this investigation.
+"Account determination for entry SKY1 GBB not possible."
 
-**Net position**: the framework side of Phase 1 (buffer engine + full ALV/coordinate-
-click coverage) is complete and live-proven. Two real orders (1979, 1980) and one real
-delivery (80001138) now exist, all created live by the framework's own automation.
-Billing remains blocked on the SKY1/GBB account-determination gap, which needs FI/CO
-specialist input to resolve safely.
+**Rather than build a new company code/plant to sidestep it, the gap was fixed
+directly** (user-directed pivot away from the `docs/config-blueprint-o2c-p2p.md` "build
+new" plan): `OBYC` had zero `SKY1`/`GBB` entries at all (added two, found by reading
+`SKY1`'s own chart of accounts rather than guessing an account number); a missing
+`FBN1` number-range interval (`49`) for company code `USAG` surfaced next and was
+added; and finally a missing tax code (`A0`) under procedure `USTAX1` was found (via
+manually invoking `ReleaseToAccounting` on the saved billing document) and created as
+a mirror of the existing `E0`. Full detail in `docs/o2c-config-fixes.md`.
+
+**Net position**: the full O2C chain is now proven live, end to end, on the existing
+`GP01`/`1000`/`1001` environment — order (1979) → delivery (`80001138`) → Post Goods
+Issue (`VBUK.WBSTK='C'`) → billing (`90001003`) → a real FI accounting document
+(`BKPF` `100000017`). No new company code or plant was needed after all — the earlier
+"build new" recommendation in `docs/config-blueprint-o2c-p2p.md` is superseded.

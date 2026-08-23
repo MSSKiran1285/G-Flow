@@ -49,6 +49,16 @@ public sealed class AlvGridHandler : ComponentHandlerBase, IAlvGridHandler
                 var value = native.Call("GetCellValue", request.Params.Row, request.Params.ColumnId) as string ?? "";
                 return Task.FromResult(new ActionResult { Success = true, ActualValue = value });
             }
+            case ActionOp.GridSetCell:
+                // VERIFY-ON-TARGET: GuiGridView.ModifyCell(row, columnId, value) — the write
+                // counterpart to GetCellValue. Needed for editable ALV grids (e.g. SE16N in
+                // &SAP_EDIT mode), where GRID_SET_CELL was previously unimplemented.
+                native.Call("ModifyCell", request.Params.Row, request.Params.ColumnId, request.Params.TextValue);
+                return Task.FromResult(new ActionResult
+                {
+                    Success = true,
+                    ActualValue = native.Call("GetCellValue", request.Params.Row, request.Params.ColumnId) as string ?? "",
+                });
             case ActionOp.GridSetScrollRow:
                 native.Set("FirstVisibleRow", request.Params.Row); // VERIFY-ON-TARGET
                 return Task.FromResult(new ActionResult { Success = true });

@@ -1,10 +1,23 @@
 # Configuration Blueprint: New O2C + P2P Environment
 
-**Status: ✅ Finalized — verification checkpoints confirmed live, execution in
-progress.** Scope, approach, and depth were explicitly chosen: **build new** (not fix
-the existing GP01/1000/1001 setup), **blueprint first** (this document, reviewed before
-execution), **minimal viable** (just enough to prove one full O2C and one full P2P
-chain, not IDES-parity breadth).
+**Status: 🔁 Superseded — this blueprint's "build new" approach (a dedicated `MBT1`
+company code/plant) was abandoned mid-execution in favor of fixing the existing
+`GP01`/`1000`/`1001` environment directly.** Reason: reusing the sandbox's own,
+already-proven master data (order/delivery/pricing) turned out cheaper than building
+and populating a whole new org structure from scratch, once the actual blockers
+(below) were narrowed down to three concrete, fixable customizing gaps rather than an
+open-ended "deep inconsistency." **The O2C chain is now proven fully end-to-end on
+`GP01`/`1000`/`1001`** — see `docs/o2c-config-fixes.md` for the exact fixes and live
+verification. This document is kept for its still-relevant investigation notes
+(below) and as the record of the path *not* taken; do not execute its "New objects to
+create" section — no `MBT1` objects should be built.
+
+Original status line (for context on what was originally decided, before the
+reversal above): "✅ Finalized — verification checkpoints confirmed live, execution in
+progress." Scope, approach, and depth were explicitly chosen at the time: **build
+new** (not fix the existing GP01/1000/1001 setup), **blueprint first** (this
+document, reviewed before execution), **minimal viable** (just enough to prove one
+full O2C and one full P2P chain, not IDES-parity breadth).
 
 ## Why build new instead of fixing GP01/1000/1001
 
@@ -166,5 +179,12 @@ in this blueprint modifies `GP01`, `1000`, `1001`, or any existing OBYC entry.
 
 ## Execution log
 
-Filled in as each step is actually done live — see `docs/assumptions.md` for the
-detailed narrative (tcodes used, exact screens, any deviation from this plan).
+**Partially started, then abandoned mid-execution.** Some early steps were done
+live before the reversal — notably an `MBT1` plant was rebuilt (via Copy-As from
+`PM01`) with a clean US address — but the company code/sales org/purchasing org
+wiring and everything downstream of it (steps 6 onward) were never done. These
+partial `MBT1` objects are inert (nothing references them) and were deliberately
+left in place rather than deleted, since removing customizing objects safely needs
+the same care as creating them; they are not part of any working chain. The actual
+execution log for what *was* completed (fixing `GP01`/`1000`/`1001` directly) lives in
+`docs/o2c-config-fixes.md` and `docs/assumptions.md`.

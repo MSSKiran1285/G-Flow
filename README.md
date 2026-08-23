@@ -24,18 +24,22 @@ everything confirmed (or found broken) against a real system.
   document numbers and `run_chain` for threading a buffer across several TestCases;
   F4-based and table-based (SE16N) master-data mining; a Typer CLI (`smt ...`) tying it
   together.
-- **Proven end-to-end against a live system, order through delivery**: scanned two real
-  screens as Modules, assembled a data-driven TestCase from them (no hardcoded
+- **Proven fully end-to-end against a live system, order through FI posting**: scanned
+  two real screens as Modules, assembled a data-driven TestCase from them (no hardcoded
   component ids), ran it against several different, historically-mined data rows, and
   got back independently verified, real saved sales orders. The buffer/chaining engine
   is built and unit-tested; live chaining then created a real **Outbound Delivery
-  (`80001138`)** referencing a real order — the first delivery ever created in this
-  project. Getting there required root-causing a VL01N "delivery split" info-log down
-  to a specific wrong shipping-point value (fixed with no config change) via
-  `COORDINATE_CLICK_FALLBACK` (a real OS-level click, built specifically because no
-  scripting-API gesture could open the log's long text). Billing (`VF01`) is now
-  blocked on a genuine FI/CO account-determination gap that needs specialist input to
-  resolve. Full narrative in `docs/assumptions.md`.
+  (`80001138`)** referencing a real order. Getting there required root-causing a VL01N
+  "delivery split" info-log down to a specific wrong shipping-point value (fixed with no
+  config change) via `COORDINATE_CLICK_FALLBACK` (a real OS-level click, built
+  specifically because no scripting-API gesture could open the log's long text). Post
+  Goods Issue then hit a genuine `OBYC` account-determination gap — rather than build a
+  new company code/plant to sidestep it, three real customizing gaps (`OBYC` account
+  determination, an `FBN1` number-range interval, an `FTXP` tax code) were found and
+  fixed live on the existing environment. **Billing (`VF01`) now produces a real FI
+  accounting document** (`BKPF` doc `100000017`) — the full O2C chain, order through FI
+  posting, is proven. Full narrative in `docs/assumptions.md`; the three fixes in detail
+  in `docs/o2c-config-fixes.md`.
 
 ## Build & test
 
@@ -111,9 +115,8 @@ discussion.
 - Self-healing (`ResolveLocator`) — not started.
 - No web UI, no FastAPI backend, no AI services, no business-process modeling.
 - Recovery scenarios (retry/relogon), reporting (HTML/JUnit) — engine MVP doesn't have
-  these yet. Buffers + chaining across TestCases exist (`run_chain`); order and
-  delivery are both proven live, and billing is blocked on a genuine FI/CO
-  account-determination gap needing specialist input, not the framework (see Status
-  above).
+  these yet. Buffers + chaining across TestCases exist (`run_chain`); the full O2C
+  chain (order → delivery → goods issue → billing → FI posting) is now proven live
+  (see Status above).
 - Many COM member names are marked `VERIFY-ON-TARGET` in `agent/SapGuiAgent/Com` and
   `Components` — some are now confirmed live (see assumptions doc), most aren't yet.
