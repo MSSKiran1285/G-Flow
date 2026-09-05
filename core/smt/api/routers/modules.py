@@ -10,6 +10,8 @@ from smt.adapter.port import UiAgentPort
 from smt.api.capture import ElementCaptureRegistry
 from smt.api.deps import get_agent, get_capture_registry, get_session_factory, resolve_connection_id
 from smt.api.schemas import (
+    HighlightRequest,
+    HighlightResponse,
     ModuleAttributeOut,
     ModuleDetail,
     ModuleSummary,
@@ -161,6 +163,24 @@ def poll_capture_endpoint(
     except KeyError:
         raise HTTPException(status_code=404, detail=f"no capture session {capture_id!r} (already stopped?)")
     return PollCaptureResponse(components=[_to_out(c) for c in components], active=active, error=error)
+
+
+@router.post("/modules/capture/{capture_id}/highlight", response_model=HighlightResponse)
+def highlight_capture_endpoint(
+    capture_id: str,
+    body: HighlightRequest,
+    captures: ElementCaptureRegistry = Depends(get_capture_registry),
+) -> HighlightResponse:
+    """Draws a colored border around `component_id` on the real, live SAP GUI screen
+    (reusing the capture session's own live handle) — lets a tester confirm which
+    on-screen control a just-captured row actually points to."""
+    try:
+        captures.highlight(capture_id, body.component_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"no capture session {capture_id!r} (already stopped?)")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return HighlightResponse()
 
 
 @router.post("/modules/capture/{capture_id}/stop", response_model=StopCaptureResponse)

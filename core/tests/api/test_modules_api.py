@@ -110,6 +110,50 @@ def test_scan_preview_falls_back_to_a_positionally_adjacent_caption(client):
     assert by_id["wnd[0]/usr/ctxtVBAK-AUART"]["caption"] == "Order Type"
 
 
+def test_scan_preview_uses_the_button_s_own_text_as_its_caption(client):
+    c, agent = client
+
+    snapshot = pb.ScreenSnapshot()
+    snapshot.root.id = "/app/con[0]/ses[0]/wnd[0]"
+    snapshot.root.type = "GuiMainWindow"
+    button = snapshot.root.children.add()
+    button.id = "/app/con[0]/ses[0]/wnd[0]/tbar[1]/btn[11]"
+    button.type = "GuiButton"
+    button.text = "Save"
+    agent.scan_result = snapshot
+
+    r = c.post("/api/modules/scan-preview", json={"tcode": "VA01", "connection_id": "conn1"})
+    assert r.status_code == 200
+    by_id = {comp["component_id"]: comp for comp in r.json()["components"]}
+    assert by_id["wnd[0]/tbar[1]/btn[11]"]["caption"] == "Save"
+
+
+def test_scan_preview_resolves_a_table_cell_s_caption_from_its_column_title(client):
+    c, agent = client
+
+    # Mirrors VA01's item overview table: a classic GuiTableControl (not an ALV grid),
+    # whose column titles come from GuiTableControl.Columns, not any GuiLabel sibling.
+    snapshot = pb.ScreenSnapshot()
+    snapshot.root.id = "/app/con[0]/ses[0]/wnd[0]"
+    snapshot.root.type = "GuiMainWindow"
+    table = snapshot.root.children.add()
+    table.id = "/app/con[0]/ses[0]/wnd[0]/usr/tblSAPMV45ATCTRL_UEBERSICHT"
+    table.type = "GuiTableControl"
+    table.table_detail.columns.add(title="Item")
+    table.table_detail.columns.add(title="Material")
+    table.table_detail.columns.add(title="Order Quantity")
+    cell = table.children.add()
+    cell.id = "/app/con[0]/ses[0]/wnd[0]/usr/tblSAPMV45ATCTRL_UEBERSICHT/ctxtRV45A-MABNR[1,3]"
+    cell.type = "GuiCTextField"
+    cell.name = "RV45A-MABNR"
+    agent.scan_result = snapshot
+
+    r = c.post("/api/modules/scan-preview", json={"tcode": "VA01", "connection_id": "conn1"})
+    assert r.status_code == 200
+    by_id = {comp["component_id"]: comp for comp in r.json()["components"]}
+    assert by_id["wnd[0]/usr/tblSAPMV45ATCTRL_UEBERSICHT/ctxtRV45A-MABNR[1,3]"]["caption"] == "Material"
+
+
 def test_save_module_persists_the_caption(client):
     c, _agent = client
 

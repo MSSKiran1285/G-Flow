@@ -564,3 +564,51 @@ Per spec §13, recorded here rather than re-confirmed inline.
      the fix: the same Ctrl+Click on `VBAK-AUART` now correctly returns
      `"caption":"Order Type"` through both the picker path and the whole-screen
      `scan-preview` path.
+- **Two more caption gaps found on user feedback against a real capture session**
+  ("button was not identified with a label, table rows/cells are not identified"):
+  3. **Self-captioned controls** (`GuiButton`, `GuiTab`, `GuiRadioButton`,
+     `GuiCheckBox`, `GuiMenu`): their own `.Text`/`.Tooltip` already IS the English
+     label (e.g. a button reading "Save") — searching for one elsewhere via the id or
+     positional heuristics just found nothing. Both sides now short-circuit to the
+     control's own text/tooltip for these types before trying anything else.
+     Live-verified: every toolbar button on VA01 now reports `caption == label` (e.g.
+     "Save   (Ctrl+S)", "Back   (F3)") instead of empty; a couple of genuinely
+     icon-only buttons with no text or tooltip at all correctly stay empty (no
+     invented data).
+  4. **Table-control (`GuiTableControl`) cells**: neither the id-sibling nor the
+     positional heuristic can find a classic table's column header, since the header
+     row sits above every data row, not aligned with any one of them — confirmed by
+     `vbap_posnr`/`rv45a_mabnr`/`rv45a_kwmeng` all coming back with an empty caption
+     on VA01's item overview table despite each column clearly having a header
+     ("Item", "Material", "Order Qty"). Fixed by finally wiring up the
+     already-defined-but-unused `TableControlDetail`/`TableColumn` proto messages: a
+     new `TableControlHandler` (agent-side) populates `ComponentNode.table_detail`
+     from `GuiTableControl.Columns` at scan time (each column's `.Title`, in the same
+     left-to-right order as a cell's own `"...[col,row]"` id suffix — confirmed live:
+     `ctxtRV45A-MABNR[1,3]` is column 1, row 3); `ComponentHitTester.
+     FindCaptionByColumn` (picker path) and `scanning._caption_by_column`
+     (whole-screen path) then look up `column_index` in that table's columns.
+     **Live-verified against the real item overview table**: `VBAP-POSNR` →
+     `"Item"`, `RV45A-MABNR` → `"Material Number"`, `RV45A-KWMENG` →
+     `"Order Quantity"` — every row of a 17-row table resolved correctly, not just
+     row 0. `GuiTableControl` previously had no handler at all (fell through to
+     `NotYetImplementedHandler`, marked `unmapped`) — two existing C# tests that used
+     `GuiTableControl` as their "still unimplemented" example were repointed to
+     `GuiShell`/`Tree`, which still is.
+- **Added a live "highlight on screen" action** (`HIGHLIGHT` in `ActionOp`, a button
+  next to each row of the capturing table in `ScanModuleDialog`) so a tester can
+  confirm which real on-screen control a captured row actually points to — handled
+  universally in `ComponentHandlerBase` (like `SET_FOCUS`) via
+  `GuiVComponent.Visualize(true)`, a one-shot call with no matching "off" (SAP clears
+  it on the next redraw). `POST /modules/capture/{id}/highlight` reuses the capture
+  session's own live handle rather than opening a new one. Live-verified: `Visualize`
+  succeeded (elapsed 6ms, no error) against a real table cell.
+- **Recurring side effect of OS-level simulated Ctrl+Clicks, seen again this
+  phase**: the live SAP window occasionally accumulates stacked "Log Off" modal
+  dialogs ("Unsaved data will be lost. Do you want to log off?") — root cause not
+  fully pinned down (suspect a mistimed synthetic click landing on a real toolbar
+  button rather than the intended field, given `SetCursorPos`/`mouse_event` clicks
+  are real OS input with no scoping to "just the picker"), but reliably recoverable:
+  scan `root_id="*"`, find the highest-numbered `wnd[N]`, press its
+  `btnSPOP-OPTION2` ("No"), repeat until only `wnd[0]` remains. No data was lost
+  either time this happened.

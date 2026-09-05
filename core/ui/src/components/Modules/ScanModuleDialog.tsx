@@ -1,4 +1,4 @@
-import { MousePointerClick, Plus, Trash2, X } from "lucide-react";
+import { Crosshair, MousePointerClick, Plus, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { api, ApiError } from "../../api";
 import type { ScannedComponentOut } from "../../types";
@@ -99,6 +99,19 @@ export function ScanModuleDialog({ onClose, onScanned }: { onClose: () => void; 
 
   const removePicked = (componentId: string) => {
     setPicked((prev) => prev.filter((c) => c.component_id !== componentId));
+  };
+
+  const [highlighting, setHighlighting] = useState<string | null>(null);
+  const highlight = async (componentId: string) => {
+    if (!captureId) return;
+    setHighlighting(componentId);
+    try {
+      await api.highlightCapture(captureId, componentId);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Could not highlight that field");
+    } finally {
+      setHighlighting(null);
+    }
   };
 
   const save = async () => {
@@ -224,6 +237,7 @@ export function ScanModuleDialog({ onClose, onScanned }: { onClose: () => void; 
                 <table className="data-table">
                   <thead>
                     <tr>
+                      <th />
                       <th>Name</th>
                       <th>English name</th>
                       <th>Value</th>
@@ -234,6 +248,17 @@ export function ScanModuleDialog({ onClose, onScanned }: { onClose: () => void; 
                   <tbody>
                     {picked.map((c) => (
                       <tr key={c.component_id}>
+                        <td style={{ width: 1 }}>
+                          <button
+                            className="drag-handle"
+                            aria-label={`Highlight ${c.component_id} on screen`}
+                            title="Highlight this field on the live SAP screen"
+                            disabled={highlighting === c.component_id}
+                            onClick={() => highlight(c.component_id)}
+                          >
+                            <Crosshair size={14} />
+                          </button>
+                        </td>
                         <td style={{ font: "var(--text-code)" }}>{names[c.component_id] ?? c.semantic_name}</td>
                         <td>{c.caption || <span className="breadcrumb">—</span>}</td>
                         <td>{c.label}</td>

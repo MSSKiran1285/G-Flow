@@ -43,6 +43,11 @@ _FAMILY_ACTIONS = {
 _SESSION_PREFIX = re.compile(r"^.*?/wnd\[")
 _WINDOW_PREFIX = re.compile(r"^(wnd\[\d+\])")
 _PREFIX_SUFFIX = re.compile(r"^([a-z]+)([A-Za-z0-9_].*)$")
+_TABLE_CELL_BRACKET = re.compile(r"\[(\d+),(\d+)\]$")
+
+# Controls whose own .text (or .tooltip, for icon-only buttons) already IS the descriptive
+# English label — mirrors ComponentHitTester.SelfCaptionedTypes on the agent side.
+_SELF_CAPTIONED_TYPES = {"GuiButton", "GuiTab", "GuiRadioButton", "GuiCheckBox", "GuiMenu"}
 
 
 def _relative_id(full_id: str) -> str:
@@ -93,6 +98,39 @@ def _caption_by_id(relative_id: str, sap_type: str, label_index: dict[str, str])
         return ""
     candidate_id = f"{parent_path}/lbl{match.group(2)}"
     return label_index.get(candidate_id, "")
+
+
+def _caption_by_column(root: pb.ComponentNode, target: pb.ComponentNode) -> str:
+    """A classic GuiTableControl cell's id ends "...[col,row]" (confirmed live on VA01's
+    item overview table: ctxtRV45A-MABNR[1,3] is column 1, row 3) — column headers sit
+    above every data row, not aligned with any one of them, so neither the id nor the
+    positional heuristic below finds them. Column index doubles as the lookup key into
+    the containing table's table_detail.columns, populated at scan time by the agent's
+    TableControlHandler from GuiTableControl.Columns (same left-to-right display order —
+    no separate technical-name matching needed). Mirrors
+    ComponentHitTester.FindCaptionByColumn."""
+    match = _TABLE_CELL_BRACKET.search(target.id)
+    if not match:
+        return ""
+    column_index = int(match.group(1))
+
+    def find_table(node: pb.ComponentNode, nearest_table: pb.ComponentNode | None) -> pb.ComponentNode | None:
+        this_table = node if node.type == "GuiTableControl" else nearest_table
+        if node is target:
+            return this_table
+        for child in node.children:
+            found = find_table(child, this_table)
+            if found is not None:
+                return found
+        return None
+
+    table = find_table(root, None)
+    if table is None:
+        return ""
+    columns = table.table_detail.columns
+    if column_index < 0 or column_index >= len(columns):
+        return ""
+    return columns[column_index].title
 
 
 def _is_caption_like(node: pb.ComponentNode) -> bool:
@@ -203,9 +241,16 @@ def scan_screen_preview(
             semantic = f"{semantic}_{node.id.split('/')[-1]}"
         seen_names.add(semantic)
         relative_id = _relative_id(node.id)
-        caption = _caption_by_id(relative_id, node.type, label_index)
-        if not caption and node.type != "GuiLabel":
-            caption = _caption_by_position(node, nodes)
+        if node.type == "GuiLabel":
+            caption = ""
+        elif node.type in _SELF_CAPTIONED_TYPES:
+            caption = node.text or node.tooltip
+        else:
+            caption = _caption_by_id(relative_id, node.type, label_index)
+            if not caption:
+                caption = _caption_by_column(snapshot.root, node)
+            if not caption:
+                caption = _caption_by_position(node, nodes)
         components.append(ScannedComponent(
             component_id=relative_id,
             window=_window_of(relative_id),

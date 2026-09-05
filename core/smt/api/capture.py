@@ -97,6 +97,18 @@ class ElementCaptureRegistry:
             drained, session.picked = session.picked, []
             return drained, session.active, session.error
 
+    def highlight(self, capture_id: str, component_id: str) -> None:
+        """Draws a colored border around `component_id` on the real, live SAP GUI
+        screen (GuiVComponent.Visualize(true), see HIGHLIGHT in uiadapter.proto) — lets
+        a tester confirm which on-screen control a captured row actually points to.
+        Reuses the capture session's own handle rather than opening a new one."""
+        session = self._require(capture_id)
+        result = session.agent.execute_action(pb.ActionRequest(
+            session_id=session.handle.session_id, component_id=component_id, op=pb.HIGHLIGHT,
+        ))
+        if not result.success:
+            raise ValueError(result.error_message or "highlight failed")
+
     def stop(self, capture_id: str) -> list[ScannedComponent]:
         session = self._sessions.pop(capture_id, None)
         if session is None:

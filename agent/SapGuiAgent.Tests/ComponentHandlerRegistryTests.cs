@@ -38,8 +38,8 @@ public class ComponentHandlerRegistryTests
     public void NotYetImplemented_marks_node_unmapped_instead_of_dropping_it()
     {
         var registry = ComponentHandlerRegistry.CreateDefault();
-        var handler = registry.Resolve("GuiTableControl", "");
-        var component = new FakeComComponent { Id = "wnd[0]/usr/tblX", Type = "GuiTableControl" };
+        var handler = registry.Resolve("GuiShell", "Tree");
+        var component = new FakeComComponent { Id = "wnd[0]/usr/treeX", Type = "GuiShell", SubType = "Tree" };
         var node = new ComponentNode { Id = component.Id, Type = component.Type };
 
         handler.EnrichSnapshot(component, node, new ScanDepthOptions());
@@ -52,12 +52,12 @@ public class ComponentHandlerRegistryTests
     public async Task NotYetImplemented_raises_UnsupportedOperation_on_execute_rather_than_faking_success()
     {
         var registry = ComponentHandlerRegistry.CreateDefault();
-        var handler = registry.Resolve("GuiTableControl", "");
-        var component = new FakeComComponent { Id = "wnd[0]/usr/tblX", Type = "GuiTableControl" };
+        var handler = registry.Resolve("GuiShell", "Tree");
+        var component = new FakeComComponent { Id = "wnd[0]/usr/treeX", Type = "GuiShell", SubType = "Tree" };
 
         var result = await handler.ExecuteAsync(component, new ActionRequest { ComponentId = component.Id, Op = ActionOp.Read }, CancellationToken.None);
 
         Assert.False(result.Success);
-        Assert.Contains("GuiTableControl", result.UnsupportedReason);
+        Assert.Contains("GuiShell", result.UnsupportedReason);
     }
 }

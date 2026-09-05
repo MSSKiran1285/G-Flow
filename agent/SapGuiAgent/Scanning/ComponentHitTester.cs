@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using SapGuiAgent.Grpc;
 
@@ -49,28 +50,56 @@ public static class ComponentHitTester
 
     private static readonly Regex PrefixSuffix = new(@"^([a-z]+)([A-Za-z0-9_].*)$", RegexOptions.Compiled);
 
-    /// <summary>Finds the descriptive caption for a value-bearing control, trying two
-    /// heuristics in order (confirmed against real screens this project has scanned —
-    /// neither one alone covers every screen):
+    /// <summary>Controls whose own .Text (or .Tooltip, for icon-only buttons) already IS the
+    /// descriptive English label — a button reading "Save" or a tab reading "Item overview"
+    /// needs no separate caption lookup; searching for one elsewhere only finds nothing or,
+    /// worse, an unrelated neighbor.</summary>
+    private static readonly HashSet<string> SelfCaptionedTypes = new()
+    {
+        "GuiButton", "GuiTab", "GuiRadioButton", "GuiCheckBox", "GuiMenu",
+    };
+
+    /// <summary>Finds the descriptive caption for a value-bearing control, trying heuristics
+    /// in order (confirmed against real screens this project has scanned — no single one
+    /// covers every case):
+    /// 0. Self-captioned controls (buttons, tabs, radio buttons, checkboxes, menu entries)
+    ///    — their own Text/Tooltip already is the caption.
     /// 1. A sibling GuiLabel with the same id suffix, "lbl" prefix instead of the
     ///    control's own (e.g. ctxtVBAK-AUART's caption is lblVBAK-AUART's text) — cheap
     ///    and precise when SAP happens to name things this way.
-    /// 2. The nearest caption-like control (a GuiLabel, or a non-editable GuiTextField
+    /// 2. For a classic table-control cell (id ends "...[col,row]"), the cell's column
+    ///    title (e.g. RV45A-MABNR's caption is its table's "Material" column header) —
+    ///    positional/sibling heuristics don't apply here since the header row sits above
+    ///    every data row, not aligned with any one of them.
+    /// 3. The nearest caption-like control (a GuiLabel, or a non-editable GuiTextField
     ///    — some screens render captions as a plain read-only text field under an
     ///    unrelated program-variable name, e.g. VA01's "Order Type" caption for
     ///    VBAK-AUART is actually RV45A-TXT_AUART) positioned immediately to the left,
     ///    on the same row — the classic positional fallback every SAP screen actually
     ///    obeys, since captions are always laid out left of or above their field.
-    /// Returns "" if the target is already its own caption (a label/button/menu) or
-    /// nothing was found either way.</summary>
+    /// Returns "" if the target is already its own caption (a label) or nothing was found
+    /// by any heuristic.</summary>
     public static string FindCaption(ComponentNode root, ComponentNode target)
     {
         if (target.Type == "GuiLabel")
         {
             return "";
         }
+        if (SelfCaptionedTypes.Contains(target.Type))
+        {
+            return !string.IsNullOrEmpty(target.Text) ? target.Text : target.Tooltip;
+        }
         var byId = FindCaptionById(root, target);
-        return !string.IsNullOrEmpty(byId) ? byId : FindCaptionByPosition(root, target);
+        if (!string.IsNullOrEmpty(byId))
+        {
+            return byId;
+        }
+        var byColumn = FindCaptionByColumn(root, target);
+        if (!string.IsNullOrEmpty(byColumn))
+        {
+            return byColumn;
+        }
+        return FindCaptionByPosition(root, target);
     }
 
     private static string FindCaptionById(ComponentNode root, ComponentNode target)
@@ -118,6 +147,54 @@ public static class ComponentHitTester
 
         Walk(root);
         return found?.Text ?? "";
+    }
+
+    /// <summary>A classic GuiTableControl cell's id ends "...[col,row]" (confirmed live on
+    /// VA01's item overview table: ctxtRV45A-MABNR[1,3] is column 1, row 3). Column index
+    /// doubles as the lookup key into the containing table's TableDetail.Columns, populated
+    /// at scan time by TableControlHandler from GuiTableControl.Columns — same left-to-right
+    /// display order, so no separate technical-name matching is needed.</summary>
+    private static string FindCaptionByColumn(ComponentNode root, ComponentNode target)
+    {
+        var lastSlash = target.Id.LastIndexOf('/');
+        var lastSegment = lastSlash >= 0 ? target.Id[(lastSlash + 1)..] : target.Id;
+        var bracket = lastSegment.IndexOf('[');
+        if (bracket < 0)
+        {
+            return "";
+        }
+        var inside = lastSegment[(bracket + 1)..].TrimEnd(']');
+        var parts = inside.Split(',');
+        if (parts.Length != 2 || !int.TryParse(parts[0], out var columnIndex))
+        {
+            return "";
+        }
+
+        var containingTable = FindContainingTable(root, target, null);
+        var columns = containingTable?.TableDetail?.Columns;
+        if (columns is null || columnIndex < 0 || columnIndex >= columns.Count)
+        {
+            return "";
+        }
+        return columns[columnIndex].Title;
+    }
+
+    private static ComponentNode? FindContainingTable(ComponentNode node, ComponentNode target, ComponentNode? nearestTable)
+    {
+        var thisTable = node.Type == "GuiTableControl" ? node : nearestTable;
+        if (ReferenceEquals(node, target))
+        {
+            return thisTable;
+        }
+        foreach (var child in node.Children)
+        {
+            var found = FindContainingTable(child, target, thisTable);
+            if (found is not null)
+            {
+                return found;
+            }
+        }
+        return null;
     }
 
     private static bool IsCaptionLike(ComponentNode node) =>

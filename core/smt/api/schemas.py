@@ -140,6 +140,14 @@ class StopCaptureResponse(BaseModel):
     components: list[ScannedComponentOut]
 
 
+class HighlightRequest(BaseModel):
+    component_id: str
+
+
+class HighlightResponse(BaseModel):
+    success: bool = True
+
+
 # --- test cases ---
 
 def _is_known_action(name: str) -> bool:

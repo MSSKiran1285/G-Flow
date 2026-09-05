@@ -174,4 +174,73 @@ public class ComponentHitTesterTests
 
         Assert.Equal("Order Type", ComponentHitTester.FindCaption(root, field));
     }
+
+    [Theory]
+    [InlineData("GuiButton")]
+    [InlineData("GuiTab")]
+    [InlineData("GuiRadioButton")]
+    [InlineData("GuiCheckBox")]
+    [InlineData("GuiMenu")]
+    public void FindCaption_uses_the_control_s_own_text_for_self_captioned_types(string type)
+    {
+        var button = Labelled("wnd[0]/tbar[1]/btn[11]", type, "Save");
+        var root = Rect("wnd[0]", 0, 0, 800, 600, button);
+
+        Assert.Equal("Save", ComponentHitTester.FindCaption(root, button));
+    }
+
+    [Fact]
+    public void FindCaption_falls_back_to_tooltip_for_an_icon_only_button_with_no_text()
+    {
+        var button = new ComponentNode { Id = "wnd[0]/tbar[1]/btn[9]", Type = "GuiButton", Text = "", Tooltip = "Enter" };
+        var root = Rect("wnd[0]", 0, 0, 800, 600, button);
+
+        Assert.Equal("Enter", ComponentHitTester.FindCaption(root, button));
+    }
+
+    private static ComponentNode TableCell(string field, int col, int row)
+    {
+        return Labelled($"wnd[0]/usr/tbl/{field}[{col},{row}]", "GuiCTextField");
+    }
+
+    [Fact]
+    public void FindCaption_resolves_a_table_cell_s_caption_from_its_column_title()
+    {
+        var table = new ComponentNode { Id = "wnd[0]/usr/tbl", Type = "GuiTableControl" };
+        table.TableDetail = new TableControlDetail();
+        table.TableDetail.Columns.Add(new TableColumn { Title = "Item" });
+        table.TableDetail.Columns.Add(new TableColumn { Title = "Material" });
+        table.TableDetail.Columns.Add(new TableColumn { Title = "Order Quantity" });
+
+        var materialCell = TableCell("ctxtRV45A-MABNR", col: 1, row: 3);
+        table.Children.Add(materialCell);
+        var root = Rect("wnd[0]", 0, 0, 800, 600, table);
+
+        Assert.Equal("Material", ComponentHitTester.FindCaption(root, materialCell));
+    }
+
+    [Fact]
+    public void FindCaption_table_column_lookup_returns_empty_when_the_index_is_out_of_range()
+    {
+        var table = new ComponentNode { Id = "wnd[0]/usr/tbl", Type = "GuiTableControl" };
+        table.TableDetail = new TableControlDetail();
+        table.TableDetail.Columns.Add(new TableColumn { Title = "Item" });
+
+        var cell = TableCell("ctxtRV45A-MABNR", col: 5, row: 0);
+        table.Children.Add(cell);
+        var root = Rect("wnd[0]", 0, 0, 800, 600, table);
+
+        Assert.Equal("", ComponentHitTester.FindCaption(root, cell));
+    }
+
+    [Fact]
+    public void FindCaption_table_column_lookup_returns_empty_when_the_cell_has_no_containing_table_detail()
+    {
+        // A bracketed id outside any GuiTableControl ancestor (e.g. hidden inside a plain
+        // container) must not throw or spuriously match — falls through to "".
+        var cell = TableCell("ctxtRV45A-MABNR", col: 0, row: 0);
+        var root = Rect("wnd[0]", 0, 0, 800, 600, cell);
+
+        Assert.Equal("", ComponentHitTester.FindCaption(root, cell));
+    }
 }

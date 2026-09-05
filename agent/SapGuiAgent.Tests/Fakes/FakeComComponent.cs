@@ -22,6 +22,10 @@ public sealed class FakeComComponent : IComComponent
 public sealed class FakeTextFieldNative
 {
     public string Text { get; set; } = "";
+    public bool Focused { get; private set; }
+    public bool? Visualized { get; private set; }
+    public void SetFocus() => Focused = true;
+    public void Visualize(bool on) => Visualized = on;
 }
 
 public sealed class FakeButtonNative
@@ -41,6 +45,26 @@ public sealed class FakeStringCollection
     public int Count => _items.Count;
     public string ElementAt(int i) => _items[i];
     public void Add(string s) => _items.Add(s);
+}
+
+public sealed class FakeTableColumn
+{
+    public string Title { get; set; } = "";
+}
+
+public sealed class FakeTableColumnCollection
+{
+    private readonly List<FakeTableColumn> _items = new();
+    public int Count => _items.Count;
+    public FakeTableColumn ElementAt(int i) => _items[i];
+    public void Add(FakeTableColumn c) => _items.Add(c);
+}
+
+public sealed class FakeTableControlNative
+{
+    public int RowCount { get; set; }
+    public int VisibleRowCount { get; set; }
+    public FakeTableColumnCollection Columns { get; } = new();
 }
 
 public sealed class FakeGridViewNative

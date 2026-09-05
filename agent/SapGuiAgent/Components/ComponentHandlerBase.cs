@@ -38,6 +38,15 @@ public abstract class ComponentHandlerBase : IComponentHandler
                 return new ActionResult { Success = true, ElapsedMs = stopwatch.ElapsedMilliseconds };
             }
 
+            // Universal across every family (GuiVComponent.Visualize(true)) — draws a
+            // colored border around the component on the real, live screen. One-shot: SAP
+            // clears it on the next redraw/interaction, so there's no matching "off" call.
+            if (request.Op == ActionOp.Highlight)
+            {
+                new ComHandle(component.Native).Call("Visualize", true);
+                return new ActionResult { Success = true, ElapsedMs = stopwatch.ElapsedMilliseconds };
+            }
+
             // Last resort (spec §11): a real OS-level mouse click at the component's screen
             // coordinates, for controls that don't honor the equivalent scripting-API call
             // (found live: SAPLSBAL_DISPLAY's log-viewer ALV grid answers GetCellValue and

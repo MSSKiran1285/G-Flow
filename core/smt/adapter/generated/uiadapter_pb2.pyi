@@ -71,6 +71,7 @@ class ActionOp(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     STATUSBAR_OPEN_LONG_TEXT: _ClassVar[ActionOp]
     COORDINATE_CLICK_FALLBACK: _ClassVar[ActionOp]
     SET_FOCUS: _ClassVar[ActionOp]
+    HIGHLIGHT: _ClassVar[ActionOp]
 
 class UiEventType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -139,6 +140,7 @@ STATUSBAR_READ: ActionOp
 STATUSBAR_OPEN_LONG_TEXT: ActionOp
 COORDINATE_CLICK_FALLBACK: ActionOp
 SET_FOCUS: ActionOp
+HIGHLIGHT: ActionOp
 UI_EVENT_UNSPECIFIED: UiEventType
 STATUSBAR_MESSAGE: UiEventType
 MODAL_OPENED: UiEventType

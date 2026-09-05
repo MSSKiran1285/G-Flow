@@ -86,6 +86,37 @@ def test_poll_does_not_duplicate_the_same_component_clicked_twice(client):
     c.post(f"/api/modules/capture/{capture_id}/stop")
 
 
+def test_highlight_calls_the_agent_with_the_capture_session_s_own_handle(client):
+    c, agent = client
+    capture_id = c.post("/api/modules/capture/start", json={"tcode": "VA01", "connection_id": "conn1"}).json()["capture_id"]
+
+    r = c.post(f"/api/modules/capture/{capture_id}/highlight", json={"component_id": "wnd[0]/usr/ctxtVBAK-AUART"})
+
+    assert r.status_code == 200
+    assert r.json() == {"success": True}
+
+    c.post(f"/api/modules/capture/{capture_id}/stop")
+
+
+def test_highlight_surfaces_an_agent_failure_as_400(client):
+    c, agent = client
+    capture_id = c.post("/api/modules/capture/start", json={"tcode": "VA01", "connection_id": "conn1"}).json()["capture_id"]
+    agent.fail_on = ("wnd[0]/usr/ctxtDOES-NOT-EXIST", pb.HIGHLIGHT)
+
+    r = c.post(f"/api/modules/capture/{capture_id}/highlight", json={"component_id": "wnd[0]/usr/ctxtDOES-NOT-EXIST"})
+
+    assert r.status_code == 400
+    assert "boom" in r.json()["detail"]
+
+    c.post(f"/api/modules/capture/{capture_id}/stop")
+
+
+def test_highlight_unknown_capture_id_returns_404(client):
+    c, _agent = client
+    r = c.post("/api/modules/capture/does-not-exist/highlight", json={"component_id": "wnd[0]"})
+    assert r.status_code == 404
+
+
 def test_poll_unknown_capture_id_returns_404(client):
     c, _agent = client
     assert c.get("/api/modules/capture/does-not-exist/poll").status_code == 404

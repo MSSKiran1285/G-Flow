@@ -16,6 +16,7 @@ public sealed class ComponentHandlerRegistry : IComponentHandlerRegistry
         registry.Register(new WindowHandler());
         registry.Register(new StatusbarHandler());
         registry.Register(new AlvGridHandler());
+        registry.Register(new TableControlHandler());
         return registry;
     }
 

@@ -51,9 +51,9 @@ public class ScreenScannerTests
     [Fact]
     public async Task ScanAsync_flags_unimplemented_families_as_unmapped_not_dropped()
     {
-        var tableField = new FakeComComponent { Id = "wnd[0]/usr/tbl1", Type = "GuiTableControl" };
+        var treeField = new FakeComComponent { Id = "wnd[0]/usr/tree1", Type = "GuiShell", SubType = "Tree" };
         var usr = new FakeComComponent { Id = "wnd[0]/usr", Type = "GuiContainerShell" };
-        usr.ChildrenList.Add(tableField);
+        usr.ChildrenList.Add(treeField);
         var session = new FakeComSession { Root = usr };
         session.Index(usr);
 
@@ -61,7 +61,7 @@ public class ScreenScannerTests
         var snapshot = await scanner.ScanAsync(session, new ScanRequest { RootId = "wnd[0]/usr" }, CancellationToken.None);
 
         Assert.Single(snapshot.Root.Children);
-        Assert.Contains("wnd[0]/usr/tbl1", snapshot.UnmappedComponentIds);
+        Assert.Contains("wnd[0]/usr/tree1", snapshot.UnmappedComponentIds);
     }
 
     [Fact]

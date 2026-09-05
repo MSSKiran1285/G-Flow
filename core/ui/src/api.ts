@@ -59,6 +59,11 @@ export const api = {
     request<PollCaptureResponse>(`/api/modules/capture/${encodeURIComponent(captureId)}/poll`),
   stopCapture: (captureId: string) =>
     request<StopCaptureResponse>(`/api/modules/capture/${encodeURIComponent(captureId)}/stop`, { method: "POST" }),
+  highlightCapture: (captureId: string, componentId: string) =>
+    request<{ success: boolean }>(`/api/modules/capture/${encodeURIComponent(captureId)}/highlight`, {
+      method: "POST",
+      body: JSON.stringify({ component_id: componentId }),
+    }),
 
   listTestCases: () => request<TestCaseSummary[]>("/api/test-cases"),
   getTestCase: (name: string) => request<TestCaseDetail>(`/api/test-cases/${encodeURIComponent(name)}`),
