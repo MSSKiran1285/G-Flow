@@ -13,9 +13,15 @@ export function ModuleDetailView({ name }: { name: string }) {
 
   if (!detail) return <p className="empty-state">Loading…</p>;
 
-  const attributes = detail.attributes.filter((a) =>
-    !filter || a.semantic_name.toLowerCase().includes(filter.toLowerCase()) || a.label.toLowerCase().includes(filter.toLowerCase())
-  );
+  const attributes = detail.attributes.filter((a) => {
+    if (!filter) return true;
+    const needle = filter.toLowerCase();
+    return (
+      a.semantic_name.toLowerCase().includes(needle) ||
+      a.label.toLowerCase().includes(needle) ||
+      a.caption.toLowerCase().includes(needle)
+    );
+  });
 
   return (
     <div className="panel">
@@ -26,7 +32,7 @@ export function ModuleDetailView({ name }: { name: string }) {
       <div className="panel-body">
         <input
           type="search"
-          placeholder="Filter attributes by name or label…"
+          placeholder="Filter attributes by name, English name, or value…"
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
           style={{ marginBottom: 12, width: "100%" }}
@@ -36,7 +42,8 @@ export function ModuleDetailView({ name }: { name: string }) {
             <thead>
               <tr>
                 <th>Semantic name</th>
-                <th>Label</th>
+                <th>English name</th>
+                <th>Value</th>
                 <th>Type</th>
                 <th>Component id</th>
               </tr>
@@ -45,6 +52,7 @@ export function ModuleDetailView({ name }: { name: string }) {
               {attributes.map((a) => (
                 <tr key={a.id}>
                   <td>{a.semantic_name}</td>
+                  <td>{a.caption || <span className="breadcrumb">—</span>}</td>
                   <td>{a.label}</td>
                   <td>{a.sap_type}</td>
                   <td style={{ font: "var(--text-code)" }}>{a.component_id}</td>

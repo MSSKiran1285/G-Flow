@@ -33,7 +33,7 @@ router = APIRouter(tags=["modules"])
 def _to_out(c: ScannedComponent) -> ScannedComponentOut:
     return ScannedComponentOut(
         component_id=c.component_id, window=c.window, semantic_name=c.semantic_name,
-        sap_type=c.sap_type, sap_sub_type=c.sap_sub_type, label=c.label,
+        sap_type=c.sap_type, sap_sub_type=c.sap_sub_type, label=c.label, caption=c.caption,
         supported_action_modes=c.supported_action_modes,
     )
 
@@ -63,7 +63,7 @@ def get_module(name: str, session_factory: sessionmaker[Session] = Depends(get_s
             attributes=[
                 ModuleAttributeOut(
                     id=a.id, semantic_name=a.semantic_name, component_id=a.component_id,
-                    sap_type=a.sap_type, sap_sub_type=a.sap_sub_type, label=a.label,
+                    sap_type=a.sap_type, sap_sub_type=a.sap_sub_type, label=a.label, caption=a.caption,
                     supported_action_modes=[m for m in a.supported_action_modes.split(",") if m],
                 )
                 for a in module.attributes

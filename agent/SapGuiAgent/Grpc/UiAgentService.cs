@@ -124,14 +124,16 @@ public sealed class UiAgentService : UiAgent.UiAgentBase
         {
             if (detector.TryDetectClick(out var x, out var y))
             {
-                var picked = await sta.RunAsync(() =>
+                var (picked, caption) = await sta.RunAsync(() =>
                 {
                     // root_id="*" so a click inside a modal popup (e.g. a completeness-check
                     // dialog) hit-tests correctly too, same as any other full-tree scan.
                     var snapshot = _scanner
                         .ScanAsync(session, new ScanRequest { SessionId = session.Id, RootId = "*" }, context.CancellationToken)
                         .GetAwaiter().GetResult();
-                    return ComponentHitTester.Find(snapshot.Root, x, y);
+                    var hit = ComponentHitTester.Find(snapshot.Root, x, y);
+                    var hitCaption = hit is null ? "" : ComponentHitTester.FindCaption(snapshot.Root, hit);
+                    return (hit, hitCaption);
                 });
 
                 // null means the click landed outside this session's own SAP GUI window
@@ -148,6 +150,7 @@ public sealed class UiAgentService : UiAgent.UiAgentBase
                         Name = picked.Name,
                         Text = picked.Text,
                         Tooltip = picked.Tooltip,
+                        Caption = caption,
                     });
                 }
             }

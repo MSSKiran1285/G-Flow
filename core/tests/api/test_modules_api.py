@@ -54,6 +54,83 @@ def test_scan_preview_returns_candidates_without_persisting_anything(client):
     assert [m["name"] for m in c.get("/api/modules").json()] == ["VA01_InitialScreen"]
 
 
+def test_scan_preview_resolves_the_caption_from_a_sibling_label(client):
+    c, agent = client
+
+    snapshot = pb.ScreenSnapshot()
+    snapshot.root.id = "/app/con[0]/ses[0]/wnd[0]"
+    snapshot.root.type = "GuiMainWindow"
+    label = snapshot.root.children.add()
+    label.id = "/app/con[0]/ses[0]/wnd[0]/usr/lblVBAK-VTWEG"
+    label.type = "GuiLabel"
+    label.text = "Distribution Channel"
+    field = snapshot.root.children.add()
+    field.id = "/app/con[0]/ses[0]/wnd[0]/usr/ctxtVBAK-VTWEG"
+    field.type = "GuiCTextField"
+    field.name = "VBAK-VTWEG"
+    field.text = "G1"
+    agent.scan_result = snapshot
+
+    r = c.post("/api/modules/scan-preview", json={"tcode": "VA01", "connection_id": "conn1"})
+    assert r.status_code == 200
+    by_id = {comp["component_id"]: comp for comp in r.json()["components"]}
+    assert by_id["wnd[0]/usr/ctxtVBAK-VTWEG"]["caption"] == "Distribution Channel"
+    assert by_id["wnd[0]/usr/ctxtVBAK-VTWEG"]["label"] == "G1"  # the current value, not the caption
+    assert by_id["wnd[0]/usr/lblVBAK-VTWEG"]["caption"] == ""  # a label has no caption of its own
+
+
+def test_scan_preview_falls_back_to_a_positionally_adjacent_caption(client):
+    c, agent = client
+
+    # Mirrors the real VA01 screen: VBAK-AUART's caption is rendered by an unrelated
+    # read-only GuiTextField (RV45A-TXT_AUART), not a lbl-prefixed id sibling.
+    snapshot = pb.ScreenSnapshot()
+    snapshot.root.id = "/app/con[0]/ses[0]/wnd[0]"
+    snapshot.root.type = "GuiMainWindow"
+    snapshot.root.width = 800
+    snapshot.root.height = 600
+    caption = snapshot.root.children.add()
+    caption.id = "/app/con[0]/ses[0]/wnd[0]/usr/txtRV45A-TXT_AUART"
+    caption.type = "GuiTextField"
+    caption.text = "Order Type"
+    caption.changeable = False
+    caption.screen_left, caption.screen_top, caption.width, caption.height = 10, 100, 80, 20
+    field = snapshot.root.children.add()
+    field.id = "/app/con[0]/ses[0]/wnd[0]/usr/ctxtVBAK-AUART"
+    field.type = "GuiCTextField"
+    field.name = "VBAK-AUART"
+    field.text = "OR"
+    field.changeable = True
+    field.screen_left, field.screen_top, field.width, field.height = 100, 100, 50, 20
+    agent.scan_result = snapshot
+
+    r = c.post("/api/modules/scan-preview", json={"tcode": "VA01", "connection_id": "conn1"})
+    assert r.status_code == 200
+    by_id = {comp["component_id"]: comp for comp in r.json()["components"]}
+    assert by_id["wnd[0]/usr/ctxtVBAK-AUART"]["caption"] == "Order Type"
+
+
+def test_save_module_persists_the_caption(client):
+    c, _agent = client
+
+    r = c.post("/api/modules", json={
+        "module_name": "VA01_WithCaption",
+        "tcode": "VA01",
+        "attributes": [
+            {
+                "semantic_name": "distribution_channel",
+                "component_id": "wnd[0]/usr/ctxtVBAK-VTWEG",
+                "sap_type": "GuiCTextField",
+                "caption": "Distribution Channel",
+            },
+        ],
+    })
+    assert r.status_code == 200
+
+    detail = c.get("/api/modules/VA01_WithCaption").json()
+    assert detail["attributes"][0]["caption"] == "Distribution Channel"
+
+
 def test_save_module_persists_only_the_curated_selection(client):
     c, _agent = client
 

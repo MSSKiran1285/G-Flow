@@ -543,3 +543,24 @@ Per spec §13, recorded here rather than re-confirmed inline.
     were ever running against the same SAP window at once, both would independently
     pick up the same click. Fine for one operator driving one capture at a time (the
     only way the UI itself can be used today), not specifically guarded against.
+- **Captured the English/descriptive caption alongside each field's technical name**
+  (`PickedComponent.caption`, `ModuleAttribute.caption`, shown as "English name" in
+  `ScanModuleDialog`/`ModuleDetailView`) — on user request, after the picker above was
+  already working. Two heuristics were needed, discovered only by testing live
+  against a real screen, not by inspection:
+  1. **Id-based sibling** (`ComponentHitTester.FindCaptionById` /
+     `scanning._caption_by_id`): many fields pair with a same-suffix `lbl`-prefixed
+     `GuiLabel` (e.g. `ctxtVBAK-AUART` ↔ `lblVBAK-AUART`) — cheap and precise when it
+     applies.
+  2. **Positional fallback** (`FindCaptionByPosition` / `_caption_by_position`):
+     a real Ctrl+Click on VA01's `VBAK-AUART` came back with an *empty* caption even
+     though "Order Type" is clearly on screen — the id-based heuristic found nothing
+     because that caption is actually rendered by an entirely unrelated control,
+     `wnd[0]/usr/txtRV45A-TXT_AUART` (a `GuiTextField`, not a `GuiLabel`), whose only
+     relationship to the field is positional (same row, immediately to its left).
+     Both C# and Python now try the id-based heuristic first, falling back to
+     "nearest caption-like (label, or non-editable text field) control on the same
+     row, strictly to the left" when it comes back empty. Live-verified again after
+     the fix: the same Ctrl+Click on `VBAK-AUART` now correctly returns
+     `"caption":"Order Type"` through both the picker path and the whole-screen
+     `scan-preview` path.

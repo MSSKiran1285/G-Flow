@@ -84,7 +84,7 @@ export function StepEditor({ step, onChange }: { step: StepSpec; onChange: (s: S
               {attributes.map((a) => (
                 <option key={a.id} value={a.semantic_name}>
                   {a.semantic_name}
-                  {a.label ? ` — ${a.label}` : ""}
+                  {a.caption ? ` — ${a.caption}` : a.label ? ` — ${a.label}` : ""}
                 </option>
               ))}
             </select>

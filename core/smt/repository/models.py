@@ -54,6 +54,12 @@ class ModuleAttribute(Base):
     sap_type: Mapped[str] = mapped_column(String(50))
     sap_sub_type: Mapped[str] = mapped_column(String(50), default="")
     label: Mapped[str] = mapped_column(String(300), default="")
+    # The field's own descriptive caption (e.g. "Order Type"), looked up from the
+    # sibling GuiLabel SAP conventionally lays out next to a value-bearing control —
+    # "" when this attribute is already its own caption (a button/label/menu) or none
+    # was found. Distinct from `label` above, which holds the control's own
+    # text/tooltip (a field's *current value*, not its caption).
+    caption: Mapped[str] = mapped_column(String(300), default="")
     supported_action_modes: Mapped[str] = mapped_column(Text, default="")  # comma-separated
 
     module: Mapped[Module] = relationship(back_populates="attributes")

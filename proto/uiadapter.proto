@@ -342,6 +342,11 @@ message PickedComponent {
   string name = 7;
   string text = 8;
   string tooltip = 9;
+  // The field's own descriptive caption (e.g. "Order Type"), found via the sibling
+  // GuiLabel SAP conventionally lays out next to a value-bearing control (same id
+  // suffix, "lbl" prefix instead of the control's own) — "" when this component is
+  // its own caption already (a button/label/menu) or no sibling label was found.
+  string caption = 10;
 }
 
 message ScreenSnapshot {

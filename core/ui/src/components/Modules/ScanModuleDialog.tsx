@@ -111,6 +111,7 @@ export function ScanModuleDialog({ onClose, onScanned }: { onClose: () => void; 
         sap_type: c.sap_type,
         sap_sub_type: c.sap_sub_type,
         label: c.label,
+        caption: c.caption,
         supported_action_modes: c.supported_action_modes,
       }));
       await api.saveModule({ module_name: moduleName, tcode, root_id: rootId, attributes });
@@ -221,10 +222,20 @@ export function ScanModuleDialog({ onClose, onScanned }: { onClose: () => void; 
               <div className="breadcrumb" style={{ marginBottom: 8 }}>{picked.length} captured so far</div>
               <div className="table-frame">
                 <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>English name</th>
+                      <th>Value</th>
+                      <th>Type</th>
+                      <th>Component id</th>
+                    </tr>
+                  </thead>
                   <tbody>
                     {picked.map((c) => (
                       <tr key={c.component_id}>
                         <td style={{ font: "var(--text-code)" }}>{names[c.component_id] ?? c.semantic_name}</td>
+                        <td>{c.caption || <span className="breadcrumb">—</span>}</td>
                         <td>{c.label}</td>
                         <td className="breadcrumb">{c.sap_type}</td>
                         <td style={{ font: "var(--text-code)" }}>{c.component_id}</td>
@@ -244,6 +255,16 @@ export function ScanModuleDialog({ onClose, onScanned }: { onClose: () => void; 
           {step === "review" && (
             <div className="table-frame">
               <table className="data-table">
+                <thead>
+                  <tr>
+                    <th />
+                    <th>Name</th>
+                    <th>English name</th>
+                    <th>Value</th>
+                    <th>Type</th>
+                    <th>Component id</th>
+                  </tr>
+                </thead>
                 <tbody>
                   {picked.map((c) => (
                     <tr key={c.component_id}>
@@ -260,6 +281,7 @@ export function ScanModuleDialog({ onClose, onScanned }: { onClose: () => void; 
                           style={{ border: "none", background: "transparent", font: "var(--text-code)", width: "100%" }}
                         />
                       </td>
+                      <td>{c.caption || <span className="breadcrumb">—</span>}</td>
                       <td>{c.label}</td>
                       <td className="breadcrumb">{c.sap_type}</td>
                       <td style={{ font: "var(--text-code)" }}>{c.component_id}</td>

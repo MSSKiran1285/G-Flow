@@ -37,6 +37,7 @@ class ModuleAttributeOut(BaseModel):
     sap_type: str
     sap_sub_type: str
     label: str
+    caption: str = ""
     supported_action_modes: list[str]
 
 
@@ -86,6 +87,7 @@ class ScannedComponentOut(BaseModel):
     sap_type: str
     sap_sub_type: str
     label: str
+    caption: str = ""
     supported_action_modes: list[str]
 
 
@@ -102,6 +104,7 @@ class SelectedAttribute(BaseModel):
     sap_type: str = ""
     sap_sub_type: str = ""
     label: str = ""
+    caption: str = ""
     supported_action_modes: list[str] = []
 
 

@@ -42,6 +42,7 @@ _FAMILY_ACTIONS = {
 
 _SESSION_PREFIX = re.compile(r"^.*?/wnd\[")
 _WINDOW_PREFIX = re.compile(r"^(wnd\[\d+\])")
+_PREFIX_SUFFIX = re.compile(r"^([a-z]+)([A-Za-z0-9_].*)$")
 
 
 def _relative_id(full_id: str) -> str:
@@ -73,6 +74,57 @@ def _walk(node: pb.ComponentNode):
         yield from _walk(child)
 
 
+def _caption_by_id(relative_id: str, sap_type: str, label_index: dict[str, str]) -> str:
+    """Finds the descriptive caption SAP conventionally renders as a sibling GuiLabel
+    next to a value-bearing control — same id suffix, "lbl" prefix instead of the
+    control's own (e.g. ctxtVBAK-AUART's caption is lblVBAK-AUART's text; confirmed
+    against dozens of real screens this project has scanned). Mirrors
+    ComponentHitTester.FindCaptionById on the agent side. Skips table-control cells
+    (ids with a "[row,col]" suffix), where this convention doesn't reliably hold."""
+    if sap_type == "GuiLabel":
+        return ""
+    last_slash = relative_id.rfind("/")
+    parent_path = relative_id[:last_slash] if last_slash >= 0 else ""
+    last_segment = relative_id[last_slash + 1:] if last_slash >= 0 else relative_id
+    if "[" in last_segment:
+        return ""
+    match = _PREFIX_SUFFIX.match(last_segment)
+    if not match:
+        return ""
+    candidate_id = f"{parent_path}/lbl{match.group(2)}"
+    return label_index.get(candidate_id, "")
+
+
+def _is_caption_like(node: pb.ComponentNode) -> bool:
+    return node.type == "GuiLabel" or (node.type == "GuiTextField" and not node.changeable)
+
+
+def _caption_by_position(target: pb.ComponentNode, candidates: list[pb.ComponentNode]) -> str:
+    """Fallback for screens where the caption isn't a lbl-prefixed id sibling but an
+    unrelated, positionally-adjacent control (confirmed live: VA01's "Order Type"
+    caption for VBAK-AUART is actually the read-only GuiTextField RV45A-TXT_AUART, no
+    naming relationship at all). Mirrors ComponentHitTester.FindCaptionByPosition:
+    nearest caption-like (GuiLabel or non-changeable GuiTextField) node on the same
+    row, strictly to the left, preferring the one closest (largest screen_left)."""
+    if target.width <= 0 or target.height <= 0:
+        return ""
+    target_center_y = target.screen_top + target.height / 2.0
+    tolerance = target.height / 2.0 + 4
+
+    best: pb.ComponentNode | None = None
+    best_left = -1
+    for node in candidates:
+        if node is target or not _is_caption_like(node) or node.width <= 0 or node.height <= 0:
+            continue
+        node_center_y = node.screen_top + node.height / 2.0
+        if (abs(node_center_y - target_center_y) <= tolerance
+                and node.screen_left + node.width <= target.screen_left
+                and node.screen_left > best_left):
+            best_left = node.screen_left
+            best = node
+    return best.text if best is not None else ""
+
+
 @dataclass
 class ScannedComponent:
     """One candidate component from a live preview scan — nothing persisted yet."""
@@ -83,6 +135,7 @@ class ScannedComponent:
     sap_type: str
     sap_sub_type: str
     label: str
+    caption: str = ""
     supported_action_modes: list[str] = field(default_factory=list)
 
 
@@ -90,7 +143,9 @@ def scanned_component_from_picked(picked: pb.PickedComponent) -> ScannedComponen
     """Converts one live-picker result (StartElementPicker) into the same shape a full
     scan_screen_preview candidate has, so the UI's picker table can render both the
     same way. Shares _relative_id/_semantic_name_from/_FAMILY_ACTIONS with the
-    whole-screen path rather than re-deriving any of it."""
+    whole-screen path rather than re-deriving any of it. `caption` was already
+    resolved agent-side (it had the live tree in hand at hit-test time) — passed
+    through as-is."""
     relative_id = _relative_id(picked.component_id)
     return ScannedComponent(
         component_id=relative_id,
@@ -99,6 +154,7 @@ def scanned_component_from_picked(picked: pb.PickedComponent) -> ScannedComponen
         sap_type=picked.type,
         sap_sub_type=picked.sub_type,
         label=picked.text or picked.tooltip,
+        caption=picked.caption,
         supported_action_modes=[m for m in _FAMILY_ACTIONS.get(picked.family, "").split(",") if m],
     )
 
@@ -132,16 +188,24 @@ def scan_screen_preview(
 
     snapshot = agent.scan_screen(pb.ScanRequest(session_id=handle.session_id, root_id=root_id))
 
+    nodes = [node for node in _walk(snapshot.root) if node.id]
+    label_index = {
+        _relative_id(node.id): node.text
+        for node in nodes
+        if node.type == "GuiLabel"
+    }
+
     components: list[ScannedComponent] = []
     seen_names: set[str] = set()
-    for node in _walk(snapshot.root):
-        if not node.id:
-            continue
+    for node in nodes:
         semantic = _semantic_name(node)
         if semantic in seen_names:
             semantic = f"{semantic}_{node.id.split('/')[-1]}"
         seen_names.add(semantic)
         relative_id = _relative_id(node.id)
+        caption = _caption_by_id(relative_id, node.type, label_index)
+        if not caption and node.type != "GuiLabel":
+            caption = _caption_by_position(node, nodes)
         components.append(ScannedComponent(
             component_id=relative_id,
             window=_window_of(relative_id),
@@ -149,6 +213,7 @@ def scan_screen_preview(
             sap_type=node.type,
             sap_sub_type=node.sub_type,
             label=node.text or node.tooltip,
+            caption=caption,
             supported_action_modes=[m for m in _FAMILY_ACTIONS.get(node.family, "").split(",") if m],
         ))
 
@@ -161,7 +226,7 @@ def _as_dict(attr: "ScannedComponent | dict") -> dict:
     return {
         "semantic_name": attr.semantic_name, "component_id": attr.component_id,
         "sap_type": attr.sap_type, "sap_sub_type": attr.sap_sub_type, "label": attr.label,
-        "supported_action_modes": attr.supported_action_modes,
+        "caption": attr.caption, "supported_action_modes": attr.supported_action_modes,
     }
 
 
@@ -197,6 +262,7 @@ def save_module(
                 sap_type=attr.get("sap_type", ""),
                 sap_sub_type=attr.get("sap_sub_type", ""),
                 label=attr.get("label", ""),
+                caption=attr.get("caption", ""),
                 supported_action_modes=",".join(modes) if isinstance(modes, list) else (modes or ""),
             ))
             count += 1
