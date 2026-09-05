@@ -167,6 +167,31 @@ didn't auto-default from the customer/material master data this time, unlike ord
 an intermittent default-resolution behavior in this sandbox's master data, not
 something introduced by any fix above.
 
+## End-to-end verification — run 3 (re-confirmation on 2026-08-27)
+
+Re-ran the whole chain again from a fresh order a few days later, specifically to
+check the fixes hold up as real time passes (not just immediately after being made):
+
+| Step | Document | Verification |
+|---|---|---|
+| Order | **`1984`** (new; customer `3`, material `103`) | `VA01`, same intermittent blank-plant quirk as run 2 — set explicitly, saved cleanly |
+| Delivery | **`80001140`** (new) | `VL01N`, shipping point `GP01`, no split |
+| PGI status | — | `VBUK.WBSTK = 'C'`, `KOSTK = 'C'`, after the routine storage-location/picking fixes **plus one new one** (below) |
+| Billing | **`90001005`** (new) | `VF01`, net value 541,00 USD, saved with no "no accounting document generated" caveat |
+| FI document | **`100000019`** / FY2026 / type `RV` | `BKPF`, `AWTYP='VBRK'`, `AWKEY='0090001005'` |
+
+**New maintenance note (not a regression in any fix above)**: PGI on this run first
+failed with `Posting only possible in periods 2026/08 and 2026/07 in company code
+USAG` even though the system date (2026-08-27) is inside that window — the
+delivery's Actual GI date (`LIKP-WADAT_IST`) defaulted to a value outside USAG's
+currently-open MM period. Fixed the same way as the original Phase-1 fiscal-period
+blocker: set `LIKP-WADAT_IST` explicitly to a date inside the open period (today's
+date worked). **This will keep recurring** as real time moves past whatever MM
+period `MMPV` was last advanced to (see fix 0b) — either re-run `MMPV` periodically
+to keep USAG's period current, or keep setting `WADAT_IST` explicitly each run. All
+three OBYC/FBN1/FTXP fixes themselves held with zero issues on this run — billing
+posted straight to FI automatically, same as run 2.
+
 ## Inert leftovers in the system (deliberately not cleaned up)
 
 - **Order `1982`**: an earlier attempt in run 2's session, created with customer `2`
