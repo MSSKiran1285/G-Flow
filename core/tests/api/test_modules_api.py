@@ -154,6 +154,47 @@ def test_scan_preview_resolves_a_table_cell_s_caption_from_its_column_title(clie
     assert by_id["wnd[0]/usr/tblSAPMV45ATCTRL_UEBERSICHT/ctxtRV45A-MABNR[1,3]"]["caption"] == "Material"
 
 
+def test_scan_preview_resolves_the_window_title_for_every_component(client):
+    c, agent = client
+
+    snapshot = pb.ScreenSnapshot()
+    snapshot.root.id = "/app/con[0]/ses[0]/wnd[0]"
+    snapshot.root.type = "GuiMainWindow"
+    snapshot.root.text = "Create Sales Order: Initial Screen"
+    field = snapshot.root.children.add()
+    field.id = "/app/con[0]/ses[0]/wnd[0]/usr/ctxtVBAK-AUART"
+    field.type = "GuiCTextField"
+    field.name = "VBAK-AUART"
+    agent.scan_result = snapshot
+
+    r = c.post("/api/modules/scan-preview", json={"tcode": "VA01", "connection_id": "conn1"})
+    assert r.status_code == 200
+    by_id = {comp["component_id"]: comp for comp in r.json()["components"]}
+    assert by_id["wnd[0]/usr/ctxtVBAK-AUART"]["window_title"] == "Create Sales Order: Initial Screen"
+    assert by_id["wnd[0]"]["window_title"] == "Create Sales Order: Initial Screen"
+
+
+def test_save_module_persists_the_window_title(client):
+    c, _agent = client
+
+    r = c.post("/api/modules", json={
+        "module_name": "VA01_WithWindowTitle",
+        "tcode": "VA01",
+        "attributes": [
+            {
+                "semantic_name": "order_type",
+                "component_id": "wnd[0]/usr/ctxtVBAK-AUART",
+                "sap_type": "GuiCTextField",
+                "window_title": "Create Sales Order: Initial Screen",
+            },
+        ],
+    })
+    assert r.status_code == 200
+
+    detail = c.get("/api/modules/VA01_WithWindowTitle").json()
+    assert detail["attributes"][0]["window_title"] == "Create Sales Order: Initial Screen"
+
+
 def test_save_module_persists_the_caption(client):
     c, _agent = client
 

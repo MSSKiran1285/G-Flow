@@ -1,6 +1,27 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { api } from "../../api";
-import type { ModuleDetail } from "../../types";
+import type { ModuleAttributeOut, ModuleDetail } from "../../types";
+
+function windowIdOf(componentId: string): string {
+  return componentId.match(/^(wnd\[\d+\])/)?.[1] ?? "";
+}
+
+/** Groups a Module's attributes by the real window/dialog they were captured from (e.g.
+ * "Create Sales Order: Initial Screen"), falling back to the technical window id or
+ * "Other" — same grouping ScanModuleDialog's capture/review tables use. */
+function groupByWindow(attributes: ModuleAttributeOut[]): [string, ModuleAttributeOut[]][] {
+  const order: string[] = [];
+  const groups = new Map<string, ModuleAttributeOut[]>();
+  for (const a of attributes) {
+    const key = a.window_title || windowIdOf(a.component_id) || "Other";
+    if (!groups.has(key)) {
+      groups.set(key, []);
+      order.push(key);
+    }
+    groups.get(key)!.push(a);
+  }
+  return order.map((key) => [key, groups.get(key)!]);
+}
 
 export function ModuleDetailView({ name }: { name: string }) {
   const [detail, setDetail] = useState<ModuleDetail | null>(null);
@@ -49,14 +70,21 @@ export function ModuleDetailView({ name }: { name: string }) {
               </tr>
             </thead>
             <tbody>
-              {attributes.map((a) => (
-                <tr key={a.id}>
-                  <td>{a.semantic_name}</td>
-                  <td>{a.caption || <span className="breadcrumb">—</span>}</td>
-                  <td>{a.label}</td>
-                  <td>{a.sap_type}</td>
-                  <td style={{ font: "var(--text-code)" }}>{a.component_id}</td>
-                </tr>
+              {groupByWindow(attributes).map(([windowTitle, rows]) => (
+                <Fragment key={windowTitle}>
+                  <tr className="table-group-row">
+                    <td colSpan={5}>{windowTitle}</td>
+                  </tr>
+                  {rows.map((a) => (
+                    <tr key={a.id}>
+                      <td>{a.semantic_name}</td>
+                      <td>{a.caption || <span className="breadcrumb">—</span>}</td>
+                      <td>{a.label}</td>
+                      <td>{a.sap_type}</td>
+                      <td style={{ font: "var(--text-code)" }}>{a.component_id}</td>
+                    </tr>
+                  ))}
+                </Fragment>
               ))}
             </tbody>
           </table>

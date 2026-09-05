@@ -60,6 +60,10 @@ class ModuleAttribute(Base):
     # was found. Distinct from `label` above, which holds the control's own
     # text/tooltip (a field's *current value*, not its caption).
     caption: Mapped[str] = mapped_column(String(300), default="")
+    # The real title of the window (wnd[N]) this attribute was captured from, e.g.
+    # "Create Sales Order: Initial Screen" — lets the UI group a Module's attributes by
+    # originating screen/dialog instead of one flat list.
+    window_title: Mapped[str] = mapped_column(String(300), default="")
     supported_action_modes: Mapped[str] = mapped_column(Text, default="")  # comma-separated
 
     module: Mapped[Module] = relationship(back_populates="attributes")

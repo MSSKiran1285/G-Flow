@@ -347,6 +347,10 @@ message PickedComponent {
   // suffix, "lbl" prefix instead of the control's own) — "" when this component is
   // its own caption already (a button/label/menu) or no sibling label was found.
   string caption = 10;
+  // The title of the window (wnd[N]) this component lives in, e.g. "Create Sales
+  // Order: Initial Screen" — lets the UI group captured fields by their originating
+  // screen/dialog instead of showing one flat list.
+  string window_title = 11;
 }
 
 message ScreenSnapshot {

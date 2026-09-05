@@ -1,5 +1,5 @@
 import { Crosshair, MousePointerClick, Plus, Trash2, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { api, ApiError } from "../../api";
 import type { ScannedComponentOut } from "../../types";
 
@@ -9,6 +9,23 @@ interface PrefillPair {
 }
 
 type Step = "configure" | "capturing" | "review";
+
+/** Groups captured fields by the real window/dialog they came from (e.g. "Create Sales
+ * Order: Initial Screen"), falling back to the technical window id or "Other" — lets a
+ * tester see at a glance which screen each field belongs to, in first-seen order. */
+function groupByWindow(components: ScannedComponentOut[]): [string, ScannedComponentOut[]][] {
+  const order: string[] = [];
+  const groups = new Map<string, ScannedComponentOut[]>();
+  for (const c of components) {
+    const key = c.window_title || c.window || "Other";
+    if (!groups.has(key)) {
+      groups.set(key, []);
+      order.push(key);
+    }
+    groups.get(key)!.push(c);
+  }
+  return order.map((key) => [key, groups.get(key)!]);
+}
 
 export function ScanModuleDialog({ onClose, onScanned }: { onClose: () => void; onScanned: () => void }) {
   const [step, setStep] = useState<Step>("configure");
@@ -125,6 +142,7 @@ export function ScanModuleDialog({ onClose, onScanned }: { onClose: () => void; 
         sap_sub_type: c.sap_sub_type,
         label: c.label,
         caption: c.caption,
+        window_title: c.window_title,
         supported_action_modes: c.supported_action_modes,
       }));
       await api.saveModule({ module_name: moduleName, tcode, root_id: rootId, attributes });
@@ -246,25 +264,32 @@ export function ScanModuleDialog({ onClose, onScanned }: { onClose: () => void; 
                     </tr>
                   </thead>
                   <tbody>
-                    {picked.map((c) => (
-                      <tr key={c.component_id}>
-                        <td style={{ width: 1 }}>
-                          <button
-                            className="drag-handle"
-                            aria-label={`Highlight ${c.component_id} on screen`}
-                            title="Highlight this field on the live SAP screen"
-                            disabled={highlighting === c.component_id}
-                            onClick={() => highlight(c.component_id)}
-                          >
-                            <Crosshair size={14} />
-                          </button>
-                        </td>
-                        <td style={{ font: "var(--text-code)" }}>{names[c.component_id] ?? c.semantic_name}</td>
-                        <td>{c.caption || <span className="breadcrumb">—</span>}</td>
-                        <td>{c.label}</td>
-                        <td className="breadcrumb">{c.sap_type}</td>
-                        <td style={{ font: "var(--text-code)" }}>{c.component_id}</td>
-                      </tr>
+                    {groupByWindow(picked).map(([windowTitle, rows]) => (
+                      <Fragment key={windowTitle}>
+                        <tr className="table-group-row">
+                          <td colSpan={6}>{windowTitle}</td>
+                        </tr>
+                        {rows.map((c) => (
+                          <tr key={c.component_id}>
+                            <td style={{ width: 1 }}>
+                              <button
+                                className="drag-handle"
+                                aria-label={`Highlight ${c.component_id} on screen`}
+                                title="Highlight this field on the live SAP screen"
+                                disabled={highlighting === c.component_id}
+                                onClick={() => highlight(c.component_id)}
+                              >
+                                <Crosshair size={14} />
+                              </button>
+                            </td>
+                            <td style={{ font: "var(--text-code)" }}>{names[c.component_id] ?? c.semantic_name}</td>
+                            <td>{c.caption || <span className="breadcrumb">—</span>}</td>
+                            <td>{c.label}</td>
+                            <td className="breadcrumb">{c.sap_type}</td>
+                            <td style={{ font: "var(--text-code)" }}>{c.component_id}</td>
+                          </tr>
+                        ))}
+                      </Fragment>
                     ))}
                     {picked.length === 0 && (
                       <tr>
@@ -291,26 +316,33 @@ export function ScanModuleDialog({ onClose, onScanned }: { onClose: () => void; 
                   </tr>
                 </thead>
                 <tbody>
-                  {picked.map((c) => (
-                    <tr key={c.component_id}>
-                      <td style={{ width: 1 }}>
-                        <button className="drag-handle" aria-label={`Remove ${c.component_id}`} onClick={() => removePicked(c.component_id)}>
-                          <Trash2 size={14} />
-                        </button>
-                      </td>
-                      <td>
-                        <input
-                          type="text"
-                          value={names[c.component_id] ?? c.semantic_name}
-                          onChange={(e) => setNames({ ...names, [c.component_id]: e.target.value })}
-                          style={{ border: "none", background: "transparent", font: "var(--text-code)", width: "100%" }}
-                        />
-                      </td>
-                      <td>{c.caption || <span className="breadcrumb">—</span>}</td>
-                      <td>{c.label}</td>
-                      <td className="breadcrumb">{c.sap_type}</td>
-                      <td style={{ font: "var(--text-code)" }}>{c.component_id}</td>
-                    </tr>
+                  {groupByWindow(picked).map(([windowTitle, rows]) => (
+                    <Fragment key={windowTitle}>
+                      <tr className="table-group-row">
+                        <td colSpan={6}>{windowTitle}</td>
+                      </tr>
+                      {rows.map((c) => (
+                        <tr key={c.component_id}>
+                          <td style={{ width: 1 }}>
+                            <button className="drag-handle" aria-label={`Remove ${c.component_id}`} onClick={() => removePicked(c.component_id)}>
+                              <Trash2 size={14} />
+                            </button>
+                          </td>
+                          <td>
+                            <input
+                              type="text"
+                              value={names[c.component_id] ?? c.semantic_name}
+                              onChange={(e) => setNames({ ...names, [c.component_id]: e.target.value })}
+                              style={{ border: "none", background: "transparent", font: "var(--text-code)", width: "100%" }}
+                            />
+                          </td>
+                          <td>{c.caption || <span className="breadcrumb">—</span>}</td>
+                          <td>{c.label}</td>
+                          <td className="breadcrumb">{c.sap_type}</td>
+                          <td style={{ font: "var(--text-code)" }}>{c.component_id}</td>
+                        </tr>
+                      ))}
+                    </Fragment>
                   ))}
                   {picked.length === 0 && (
                     <tr>

@@ -256,6 +256,15 @@ table {
   font-weight: 600;
 }
 
+.data-table tbody tr.table-group-row td {
+  background: var(--bg);
+  color: var(--text-muted);
+  font: var(--text-label);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: normal;
+}
+
 .data-table tbody tr.selected {
   background: var(--selected-bg);
   color: var(--selected-text);

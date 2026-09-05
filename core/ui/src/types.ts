@@ -21,6 +21,7 @@ export interface ModuleAttributeOut {
   sap_sub_type: string;
   label: string;
   caption: string;
+  window_title: string;
   supported_action_modes: string[];
 }
 
@@ -71,6 +72,7 @@ export interface ScannedComponentOut {
   sap_sub_type: string;
   label: string;
   caption: string;
+  window_title: string;
   supported_action_modes: string[];
 }
 
@@ -88,6 +90,7 @@ export interface SelectedAttribute {
   sap_sub_type?: string;
   label?: string;
   caption?: string;
+  window_title?: string;
   supported_action_modes?: string[];
 }
 

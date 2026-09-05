@@ -62,6 +62,30 @@ def test_poll_passes_through_the_agent_resolved_caption(client):
     c.post(f"/api/modules/capture/{capture_id}/stop")
 
 
+def test_poll_passes_through_the_agent_resolved_window_title(client):
+    c, agent = client
+    agent.picked_components = [
+        pb.PickedComponent(
+            component_id="/app/con[0]/ses[0]/wnd[0]/usr/ctxtVBAK-AUART",
+            type="GuiCTextField", name="VBAK-AUART",
+            window_title="Create Sales Order: Initial Screen",
+        ),
+    ]
+
+    capture_id = c.post("/api/modules/capture/start", json={"tcode": "VA01", "connection_id": "conn1"}).json()["capture_id"]
+
+    def got_one():
+        poll = c.get(f"/api/modules/capture/{capture_id}/poll").json()
+        got_one.seen.extend(poll["components"])
+        return len(got_one.seen) >= 1
+
+    got_one.seen = []
+    assert _wait_until(got_one)
+    assert got_one.seen[0]["window_title"] == "Create Sales Order: Initial Screen"
+
+    c.post(f"/api/modules/capture/{capture_id}/stop")
+
+
 def test_poll_does_not_duplicate_the_same_component_clicked_twice(client):
     c, agent = client
     same = pb.PickedComponent(component_id="/app/con[0]/ses[0]/wnd[0]/usr/ctxtVBAK-AUART", type="GuiCTextField", name="VBAK-AUART")

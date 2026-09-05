@@ -612,3 +612,38 @@ Per spec §13, recorded here rather than re-confirmed inline.
   scan `root_id="*"`, find the highest-numbered `wnd[N]`, press its
   `btnSPOP-OPTION2` ("No"), repeat until only `wnd[0]` remains. No data was lost
   either time this happened.
+- **Root-caused (partially) on user feedback: "pick and choose is extremely slow",
+  plus two feature requests** — highlight-on-screen wasn't visibly working for the
+  user, and captured fields should be grouped by their originating window (e.g.
+  "Create Sales Order: Initial Screen" showing Order Type/Sales Org/Distribution
+  Channel/Division together, not a flat list).
+  - **Performance**: `StartElementPicker` was doing a full `root_id="*"` rescan on
+    *every single click* — confirmed live this session that a full scan of a
+    data-heavy screen (VA01's item overview table) can take 20-30s (hundreds of
+    cells × ~11 late-bound COM property reads each), making a multi-click capture
+    session unusable. Fixed by caching the snapshot across clicks, refreshed only
+    when a cheap check (`GuiSessionInfo`: tcode/screen/window count/modal titles —
+    no tree walk) shows the screen actually changed. Known tradeoff: scrolling a
+    table without changing screen/tcode goes undetected between clicks.
+  - **Window grouping**: added `window_title` (the real on-screen title of the
+    window/dialog a field lives in, e.g. via `GuiMainWindow.Text`) alongside every
+    captured/scanned component and persisted `ModuleAttribute` — both
+    `ScanModuleDialog`'s capturing/review tables and `ModuleDetailView` now render a
+    header row per distinct window before its fields. Live-verified via
+    `scan-preview`: `VBAK-AUART` on VA01's initial screen correctly resolves
+    `window_title` to `"Create Sales Order: Initial Screen"`.
+  - **Highlight re-verified working** (`HIGHLIGHT`/`Visualize(true)`, unchanged
+    logic) via direct `execute_action` — still succeeds against a real component.
+  - **Environment finding, not a code bug**: while trying to live-verify the
+    performance fix via simulated Ctrl+Clicks, discovered `SetCursorPos` returning
+    `false` and `GetCursorPos` reporting `(0,0)` regardless of what was set —
+    this automation session had lost control of the interactive desktop/cursor
+    (unrelated to `SapGuiAgent.exe`, confirmed via a bare P/Invoke probe with no
+    SAP involvement at all). This likely also explains some of the earlier stray
+    "Log Off" dialogs: a synthetic click that never actually moved the cursor can
+    still deliver mouse-down/up at the *previous* cursor position, landing on
+    whatever real control happens to be there. Click-triggered, end-to-end
+    verification of the picker's performance/caching behavior specifically is
+    blocked until the session regains interactive cursor control; the caching
+    logic itself is unit-tested and the surrounding features (window_title,
+    highlight, captions) were all confirmed via non-cursor-dependent live calls.

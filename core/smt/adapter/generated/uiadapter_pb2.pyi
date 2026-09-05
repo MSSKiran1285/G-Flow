@@ -586,7 +586,7 @@ class ComponentNode(_message.Message):
     def __init__(self, id: _Optional[str] = ..., type: _Optional[str] = ..., type_as_number: _Optional[int] = ..., sub_type: _Optional[str] = ..., family: _Optional[_Union[ComponentFamily, str]] = ..., name: _Optional[str] = ..., text: _Optional[str] = ..., tooltip: _Optional[str] = ..., default_tooltip: _Optional[str] = ..., icon_name: _Optional[str] = ..., screen_left: _Optional[int] = ..., screen_top: _Optional[int] = ..., width: _Optional[int] = ..., height: _Optional[int] = ..., changeable: _Optional[bool] = ..., modified: _Optional[bool] = ..., is_container: _Optional[bool] = ..., masked: _Optional[bool] = ..., children: _Optional[_Iterable[_Union[ComponentNode, _Mapping]]] = ..., shell_detail: _Optional[_Union[ShellDetail, _Mapping]] = ..., table_detail: _Optional[_Union[TableControlDetail, _Mapping]] = ..., menu_detail: _Optional[_Union[MenuDetail, _Mapping]] = ..., raw_properties: _Optional[_Mapping[str, str]] = ..., unmapped: _Optional[bool] = ..., coverage_status: _Optional[str] = ...) -> None: ...
 
 class PickedComponent(_message.Message):
-    __slots__ = ("contract_version", "session_id", "component_id", "type", "sub_type", "family", "name", "text", "tooltip", "caption")
+    __slots__ = ("contract_version", "session_id", "component_id", "type", "sub_type", "family", "name", "text", "tooltip", "caption", "window_title")
     CONTRACT_VERSION_FIELD_NUMBER: _ClassVar[int]
     SESSION_ID_FIELD_NUMBER: _ClassVar[int]
     COMPONENT_ID_FIELD_NUMBER: _ClassVar[int]
@@ -597,6 +597,7 @@ class PickedComponent(_message.Message):
     TEXT_FIELD_NUMBER: _ClassVar[int]
     TOOLTIP_FIELD_NUMBER: _ClassVar[int]
     CAPTION_FIELD_NUMBER: _ClassVar[int]
+    WINDOW_TITLE_FIELD_NUMBER: _ClassVar[int]
     contract_version: str
     session_id: str
     component_id: str
@@ -607,7 +608,8 @@ class PickedComponent(_message.Message):
     text: str
     tooltip: str
     caption: str
-    def __init__(self, contract_version: _Optional[str] = ..., session_id: _Optional[str] = ..., component_id: _Optional[str] = ..., type: _Optional[str] = ..., sub_type: _Optional[str] = ..., family: _Optional[_Union[ComponentFamily, str]] = ..., name: _Optional[str] = ..., text: _Optional[str] = ..., tooltip: _Optional[str] = ..., caption: _Optional[str] = ...) -> None: ...
+    window_title: str
+    def __init__(self, contract_version: _Optional[str] = ..., session_id: _Optional[str] = ..., component_id: _Optional[str] = ..., type: _Optional[str] = ..., sub_type: _Optional[str] = ..., family: _Optional[_Union[ComponentFamily, str]] = ..., name: _Optional[str] = ..., text: _Optional[str] = ..., tooltip: _Optional[str] = ..., caption: _Optional[str] = ..., window_title: _Optional[str] = ...) -> None: ...
 
 class ScreenSnapshot(_message.Message):
     __slots__ = ("contract_version", "session_id", "context", "root", "snapshot_hash", "captured_at_epoch_ms", "unmapped_component_ids")

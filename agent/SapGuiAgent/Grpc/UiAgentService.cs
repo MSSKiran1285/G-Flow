@@ -1,3 +1,4 @@
+using System.Linq;
 using Grpc.Core;
 using SapGuiAgent.Com;
 using SapGuiAgent.Components;
@@ -120,20 +121,39 @@ public sealed class UiAgentService : UiAgent.UiAgentBase
     {
         var (session, sta) = RequireSession(request.SessionId);
         var detector = new ClickEdgeDetector();
+        ScreenSnapshot? cachedSnapshot = null;
+        ScreenContext? cachedContext = null;
+
         while (!context.CancellationToken.IsCancellationRequested)
         {
             if (detector.TryDetectClick(out var x, out var y))
             {
-                var (picked, caption) = await sta.RunAsync(() =>
+                var (picked, caption, windowTitle) = await sta.RunAsync(() =>
                 {
-                    // root_id="*" so a click inside a modal popup (e.g. a completeness-check
-                    // dialog) hit-tests correctly too, same as any other full-tree scan.
-                    var snapshot = _scanner
-                        .ScanAsync(session, new ScanRequest { SessionId = session.Id, RootId = "*" }, context.CancellationToken)
-                        .GetAwaiter().GetResult();
-                    var hit = ComponentHitTester.Find(snapshot.Root, x, y);
-                    var hitCaption = hit is null ? "" : ComponentHitTester.FindCaption(snapshot.Root, hit);
-                    return (hit, hitCaption);
+                    // Found live: a full root_id="*" rescan on every single click made the
+                    // picker unusably slow on data-heavy screens (VA01's item overview table
+                    // alone can take 20s+ to scan — hundreds of cells, each needing several
+                    // late-bound COM round trips per property). A capture session is someone
+                    // picking several fields off the SAME static screen, so the snapshot only
+                    // needs refreshing when the screen actually changes — checked cheaply via
+                    // GuiSessionInfo (tcode/screen/window count/modal titles), not a tree walk.
+                    // Known tradeoff: scrolling a table without changing screen/tcode (e.g.
+                    // paging its rows) goes undetected, so a click after a scroll can hit-test
+                    // against stale row positions until something else invalidates the cache.
+                    var currentContext = session.CaptureContext();
+                    if (cachedSnapshot is null || !SameScreen(cachedContext, currentContext))
+                    {
+                        // root_id="*" so a click inside a modal popup (e.g. a completeness-check
+                        // dialog) hit-tests correctly too, same as any other full-tree scan.
+                        cachedSnapshot = _scanner
+                            .ScanAsync(session, new ScanRequest { SessionId = session.Id, RootId = "*" }, context.CancellationToken)
+                            .GetAwaiter().GetResult();
+                        cachedContext = currentContext;
+                    }
+                    var hit = ComponentHitTester.Find(cachedSnapshot.Root, x, y);
+                    var hitCaption = hit is null ? "" : ComponentHitTester.FindCaption(cachedSnapshot.Root, hit);
+                    var hitWindowTitle = hit is null ? "" : ComponentHitTester.FindWindowTitle(cachedSnapshot.Root, hit);
+                    return (hit, hitCaption, hitWindowTitle);
                 });
 
                 // null means the click landed outside this session's own SAP GUI window
@@ -151,6 +171,7 @@ public sealed class UiAgentService : UiAgent.UiAgentBase
                         Text = picked.Text,
                         Tooltip = picked.Tooltip,
                         Caption = caption,
+                        WindowTitle = windowTitle,
                     });
                 }
             }
@@ -164,6 +185,21 @@ public sealed class UiAgentService : UiAgent.UiAgentBase
                 break;
             }
         }
+    }
+
+    /// <summary>Cheap enough to call on every click (a handful of GuiSessionInfo property
+    /// reads, no tree walk) — used to decide whether the picker's cached snapshot is still
+    /// good or the screen has actually moved on and needs a fresh (expensive) rescan.</summary>
+    private static bool SameScreen(ScreenContext? cached, ScreenContext current)
+    {
+        if (cached is null)
+        {
+            return false;
+        }
+        return cached.TransactionCode == current.TransactionCode
+            && cached.ScreenNumber == current.ScreenNumber
+            && cached.WindowCount == current.WindowCount
+            && cached.ModalStack.SequenceEqual(current.ModalStack);
     }
 
     public override async Task<ImageBlob> CaptureScreenshot(CaptureRequest request, ServerCallContext context)

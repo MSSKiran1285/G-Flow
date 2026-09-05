@@ -174,6 +174,7 @@ class ScannedComponent:
     sap_sub_type: str
     label: str
     caption: str = ""
+    window_title: str = ""
     supported_action_modes: list[str] = field(default_factory=list)
 
 
@@ -181,9 +182,9 @@ def scanned_component_from_picked(picked: pb.PickedComponent) -> ScannedComponen
     """Converts one live-picker result (StartElementPicker) into the same shape a full
     scan_screen_preview candidate has, so the UI's picker table can render both the
     same way. Shares _relative_id/_semantic_name_from/_FAMILY_ACTIONS with the
-    whole-screen path rather than re-deriving any of it. `caption` was already
-    resolved agent-side (it had the live tree in hand at hit-test time) — passed
-    through as-is."""
+    whole-screen path rather than re-deriving any of it. `caption`/`window_title` were
+    already resolved agent-side (it had the live tree in hand at hit-test time) —
+    passed through as-is."""
     relative_id = _relative_id(picked.component_id)
     return ScannedComponent(
         component_id=relative_id,
@@ -193,6 +194,7 @@ def scanned_component_from_picked(picked: pb.PickedComponent) -> ScannedComponen
         sap_sub_type=picked.sub_type,
         label=picked.text or picked.tooltip,
         caption=picked.caption,
+        window_title=picked.window_title,
         supported_action_modes=[m for m in _FAMILY_ACTIONS.get(picked.family, "").split(",") if m],
     )
 
@@ -232,6 +234,15 @@ def scan_screen_preview(
         for node in nodes
         if node.type == "GuiLabel"
     }
+    # A window's own node has a relative id that IS exactly its window id (e.g. "wnd[0]",
+    # or "wnd[1]" for a modal when root_id="*") — its .text is that window's real title
+    # (e.g. "Create Sales Order: Initial Screen"), letting the UI group captured fields by
+    # originating screen/dialog instead of one flat list.
+    window_title_index = {
+        _relative_id(node.id): node.text
+        for node in nodes
+        if _relative_id(node.id) == _window_of(_relative_id(node.id))
+    }
 
     components: list[ScannedComponent] = []
     seen_names: set[str] = set()
@@ -259,6 +270,7 @@ def scan_screen_preview(
             sap_sub_type=node.sub_type,
             label=node.text or node.tooltip,
             caption=caption,
+            window_title=window_title_index.get(_window_of(relative_id), ""),
             supported_action_modes=[m for m in _FAMILY_ACTIONS.get(node.family, "").split(",") if m],
         ))
 
@@ -271,7 +283,8 @@ def _as_dict(attr: "ScannedComponent | dict") -> dict:
     return {
         "semantic_name": attr.semantic_name, "component_id": attr.component_id,
         "sap_type": attr.sap_type, "sap_sub_type": attr.sap_sub_type, "label": attr.label,
-        "caption": attr.caption, "supported_action_modes": attr.supported_action_modes,
+        "caption": attr.caption, "window_title": attr.window_title,
+        "supported_action_modes": attr.supported_action_modes,
     }
 
 
@@ -308,6 +321,7 @@ def save_module(
                 sap_sub_type=attr.get("sap_sub_type", ""),
                 label=attr.get("label", ""),
                 caption=attr.get("caption", ""),
+                window_title=attr.get("window_title", ""),
                 supported_action_modes=",".join(modes) if isinstance(modes, list) else (modes or ""),
             ))
             count += 1

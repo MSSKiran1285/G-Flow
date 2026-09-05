@@ -197,6 +197,49 @@ public static class ComponentHitTester
         return null;
     }
 
+    private static readonly Regex WindowSegment = new(@"(?:^|/)(wnd\[\d+\])(?:/|$)", RegexOptions.Compiled);
+
+    /// <summary>The title of the window (wnd[N]) `target` lives in — e.g. "Create Sales
+    /// Order: Initial Screen" for a field on VA01's initial screen, or a popup's own title
+    /// for a field inside it. Lets the UI group captured fields by originating screen/dialog
+    /// instead of one flat list. A root_id="*" scan's tree has every open window's node
+    /// somewhere under `root` (see ScreenScanner), each keyed by its own "wnd[N]" id — this
+    /// just finds the one matching target's own window segment and returns its .Text.</summary>
+    public static string FindWindowTitle(ComponentNode root, ComponentNode target)
+    {
+        var match = WindowSegment.Match(target.Id);
+        if (!match.Success)
+        {
+            return "";
+        }
+        var windowId = match.Groups[1].Value;
+
+        string? found = null;
+        void Walk(ComponentNode node)
+        {
+            if (found is not null)
+            {
+                return;
+            }
+            if (node.Id == windowId || node.Id.EndsWith("/" + windowId, StringComparison.Ordinal))
+            {
+                found = node.Text;
+                return;
+            }
+            foreach (var child in node.Children)
+            {
+                Walk(child);
+                if (found is not null)
+                {
+                    return;
+                }
+            }
+        }
+
+        Walk(root);
+        return found ?? "";
+    }
+
     private static bool IsCaptionLike(ComponentNode node) =>
         node.Type == "GuiLabel" || (node.Type == "GuiTextField" && !node.Changeable);
 

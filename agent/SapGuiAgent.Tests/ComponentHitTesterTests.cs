@@ -243,4 +243,37 @@ public class ComponentHitTesterTests
 
         Assert.Equal("", ComponentHitTester.FindCaption(root, cell));
     }
+
+    [Fact]
+    public void FindWindowTitle_returns_the_main_window_s_own_title_for_a_field_inside_it()
+    {
+        var field = Labelled("wnd[0]/usr/ctxtVBAK-AUART", "GuiCTextField");
+        var root = new ComponentNode { Id = "wnd[0]", Type = "GuiMainWindow", Text = "Create Sales Order: Initial Screen" };
+        root.Children.Add(field);
+
+        Assert.Equal("Create Sales Order: Initial Screen", ComponentHitTester.FindWindowTitle(root, field));
+    }
+
+    [Fact]
+    public void FindWindowTitle_returns_a_modal_popup_s_own_title_for_a_field_inside_it()
+    {
+        // root_id="*" scans append modal windows as additional children of the wnd[0] node
+        // (see ScreenScanner) — wnd[1]'s own title must resolve, not wnd[0]'s.
+        var popupField = Labelled("wnd[1]/usr/txtMSGTXT1", "GuiTextField");
+        var popup = new ComponentNode { Id = "wnd[1]", Type = "GuiModalWindow", Text = "Information" };
+        popup.Children.Add(popupField);
+        var root = new ComponentNode { Id = "wnd[0]", Type = "GuiMainWindow", Text = "Create Sales Order: Initial Screen" };
+        root.Children.Add(popup);
+
+        Assert.Equal("Information", ComponentHitTester.FindWindowTitle(root, popupField));
+    }
+
+    [Fact]
+    public void FindWindowTitle_returns_empty_when_the_id_has_no_window_segment()
+    {
+        var field = new ComponentNode { Id = "not-a-window-id" };
+        var root = Rect("wnd[0]", 0, 0, 800, 600, field);
+
+        Assert.Equal("", ComponentHitTester.FindWindowTitle(root, field));
+    }
 }
