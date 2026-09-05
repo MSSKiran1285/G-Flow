@@ -7,22 +7,35 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from smt.adapter.generated import uiadapter_pb2 as pb
 from smt.adapter.port import UiAgentPort
-from smt.api.deps import get_agent, get_session_factory, resolve_connection_id
+from smt.api.capture import ElementCaptureRegistry
+from smt.api.deps import get_agent, get_capture_registry, get_session_factory, resolve_connection_id
 from smt.api.schemas import (
     ModuleAttributeOut,
     ModuleDetail,
     ModuleSummary,
+    PollCaptureResponse,
     ScannedComponentOut,
     ScanModuleRequest,
     ScanModuleResponse,
     ScanPreviewRequest,
     ScanPreviewResponse,
     SaveModuleRequest,
+    StartCaptureRequest,
+    StartCaptureResponse,
+    StopCaptureResponse,
 )
 from smt.repository.models import Module
-from smt.repository.scanning import save_module, scan_module, scan_screen_preview
+from smt.repository.scanning import ScannedComponent, save_module, scan_module, scan_screen_preview
 
 router = APIRouter(tags=["modules"])
+
+
+def _to_out(c: ScannedComponent) -> ScannedComponentOut:
+    return ScannedComponentOut(
+        component_id=c.component_id, window=c.window, semantic_name=c.semantic_name,
+        sap_type=c.sap_type, sap_sub_type=c.sap_sub_type, label=c.label,
+        supported_action_modes=c.supported_action_modes,
+    )
 
 
 def _to_summary(module: Module) -> ModuleSummary:
@@ -102,14 +115,7 @@ def scan_preview_endpoint(
 
     return ScanPreviewResponse(
         tcode=body.tcode, screen_number=screen_number, root_id=body.root_id,
-        components=[
-            ScannedComponentOut(
-                component_id=c.component_id, window=c.window, semantic_name=c.semantic_name,
-                sap_type=c.sap_type, sap_sub_type=c.sap_sub_type, label=c.label,
-                supported_action_modes=c.supported_action_modes,
-            )
-            for c in components
-        ],
+        components=[_to_out(c) for c in components],
     )
 
 
@@ -125,3 +131,45 @@ def save_module_endpoint(
         screen_number=body.screen_number, attributes=[a.model_dump() for a in body.attributes],
     )
     return ScanModuleResponse(module_id=module_id, module_name=body.module_name, attribute_count=count)
+
+
+@router.post("/modules/capture/start", response_model=StartCaptureResponse)
+def start_capture_endpoint(
+    body: StartCaptureRequest,
+    agent: UiAgentPort = Depends(get_agent),
+    captures: ElementCaptureRegistry = Depends(get_capture_registry),
+) -> StartCaptureResponse:
+    """Launches the transaction (if `navigate`) and starts watching for Ctrl+Click on
+    the live SAP GUI window — each click identifies and adds one field/button, until
+    /modules/capture/{id}/stop is called. Poll /modules/capture/{id}/poll to see
+    newly-picked components as they arrive."""
+    connection_id = resolve_connection_id(agent, body.connection_id)
+    capture_id = captures.start(
+        agent, connection_id=connection_id, tcode=body.tcode, navigate=body.navigate,
+        prefill=body.prefill, vkeys_before_scan=body.vkeys_before_scan,
+    )
+    return StartCaptureResponse(capture_id=capture_id)
+
+
+@router.get("/modules/capture/{capture_id}/poll", response_model=PollCaptureResponse)
+def poll_capture_endpoint(
+    capture_id: str,
+    captures: ElementCaptureRegistry = Depends(get_capture_registry),
+) -> PollCaptureResponse:
+    try:
+        components, active, error = captures.poll(capture_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"no capture session {capture_id!r} (already stopped?)")
+    return PollCaptureResponse(components=[_to_out(c) for c in components], active=active, error=error)
+
+
+@router.post("/modules/capture/{capture_id}/stop", response_model=StopCaptureResponse)
+def stop_capture_endpoint(
+    capture_id: str,
+    captures: ElementCaptureRegistry = Depends(get_capture_registry),
+) -> StopCaptureResponse:
+    try:
+        components = captures.stop(capture_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"no capture session {capture_id!r} (already stopped?)")
+    return StopCaptureResponse(components=[_to_out(c) for c in components])

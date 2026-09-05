@@ -77,6 +77,16 @@ class UiAgentClient:
         handle.contract_version = CONTRACT_VERSION
         yield from self._stub.Subscribe(handle)
 
+    def start_element_picker(self, handle: pb.SessionHandle) -> Iterator[pb.PickedComponent]:
+        # Deliberately NOT a `yield from`-wrapping generator like subscribe() above: the
+        # caller needs the raw grpc streaming-call object back (not a generator hiding
+        # it) so it can call `.cancel()` on it later to stop picking — cancelling the
+        # call is what ends the agent's StartElementPicker loop server-side (same
+        # convention as Subscribe's own CancellationToken, just driven by an explicit
+        # stop button here instead of the client just walking away).
+        handle.contract_version = CONTRACT_VERSION
+        return self._stub.StartElementPicker(handle)
+
     def capture_screenshot(self, request: pb.CaptureRequest) -> pb.ImageBlob:
         request.contract_version = CONTRACT_VERSION
         return self._stub.CaptureScreenshot(request)

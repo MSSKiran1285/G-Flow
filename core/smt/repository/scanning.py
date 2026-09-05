@@ -52,10 +52,14 @@ def _relative_id(full_id: str) -> str:
     return _SESSION_PREFIX.sub("wnd[", full_id, count=1)
 
 
-def _semantic_name(node: pb.ComponentNode) -> str:
-    raw = node.name or node.id.rsplit("/", 1)[-1]
+def _semantic_name_from(name: str, id_: str) -> str:
+    raw = name or id_.rsplit("/", 1)[-1]
     slug = re.sub(r"[^a-z0-9]+", "_", raw.lower()).strip("_")
     return slug or "unnamed"
+
+
+def _semantic_name(node: pb.ComponentNode) -> str:
+    return _semantic_name_from(node.name, node.id)
 
 
 def _window_of(relative_id: str) -> str:
@@ -80,6 +84,23 @@ class ScannedComponent:
     sap_sub_type: str
     label: str
     supported_action_modes: list[str] = field(default_factory=list)
+
+
+def scanned_component_from_picked(picked: pb.PickedComponent) -> ScannedComponent:
+    """Converts one live-picker result (StartElementPicker) into the same shape a full
+    scan_screen_preview candidate has, so the UI's picker table can render both the
+    same way. Shares _relative_id/_semantic_name_from/_FAMILY_ACTIONS with the
+    whole-screen path rather than re-deriving any of it."""
+    relative_id = _relative_id(picked.component_id)
+    return ScannedComponent(
+        component_id=relative_id,
+        window=_window_of(relative_id),
+        semantic_name=_semantic_name_from(picked.name, relative_id),
+        sap_type=picked.type,
+        sap_sub_type=picked.sub_type,
+        label=picked.text or picked.tooltip,
+        supported_action_modes=[m for m in _FAMILY_ACTIONS.get(picked.family, "").split(",") if m],
+    )
 
 
 def scan_screen_preview(

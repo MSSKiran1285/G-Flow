@@ -113,6 +113,30 @@ class SaveModuleRequest(BaseModel):
     attributes: list[SelectedAttribute]
 
 
+# --- live element picker (Ctrl+Click capture) ---
+
+class StartCaptureRequest(BaseModel):
+    tcode: str
+    navigate: bool = True
+    prefill: dict[str, str] = {}
+    vkeys_before_scan: list[str] = []
+    connection_id: str | None = None
+
+
+class StartCaptureResponse(BaseModel):
+    capture_id: str
+
+
+class PollCaptureResponse(BaseModel):
+    components: list[ScannedComponentOut]
+    active: bool
+    error: str | None = None
+
+
+class StopCaptureResponse(BaseModel):
+    components: list[ScannedComponentOut]
+
+
 # --- test cases ---
 
 def _is_known_action(name: str) -> bool:

@@ -129,12 +129,13 @@ core/.venv/Scripts/python -m smt.cli.main run-api    # :8000
 cd core/ui && npm install && npm run dev             # :5173, proxies /api to :8000
 ```
 
-Open `http://localhost:5173`. **Modules**: browse scanned screens, or scan a new one
-live (tcode, optional prefill fields/vkeys to reach a second screen) — the scan is a
-two-step *preview then pick*: every field/button/label found is shown grouped by
-window (`wnd[0]`, `wnd[1]`, ...) with a checkbox and an editable name per row, and
-only the ones actually checked get saved as the Module's attributes, not the whole
-screen. **Scripts**:
+Open `http://localhost:5173`. **Modules**: browse scanned screens, or capture a new one
+live — enter a tcode, "Launch & start picking" navigates to it, then hold **Ctrl** and
+click each field/button/control directly in the real SAP GUI window; each Ctrl+Click
+identifies exactly that component (live hit-testing against its actual screen
+position) and adds it to a growing list in the browser in real time. Press "Stop
+scanning" when done, rename anything you like, then save — only what you actually
+clicked becomes the Module's attributes, never the whole screen. **Scripts**:
 build a TestCase's steps visually — pick a Module+attribute (or a raw component id
 for conditional elements like popups), an action, a binding (literal / from test data
 / captured by an earlier step), reorder via drag-and-drop or the keyboard (arrow keys

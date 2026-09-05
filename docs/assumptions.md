@@ -474,3 +474,72 @@ Per spec §13, recorded here rather than re-confirmed inline.
   (`VBUK.WBSTK='C'`), this closes out the full O2C chain (order → delivery → goods issue
   → billing → FI posting) live, on the existing environment, with no new company
   code/plant needed after all.
+
+## Phase 3: script-builder web UI, then a live Ctrl+Click element picker
+
+- **Built a lean FastAPI + React UI** (`core/smt/api/`, `core/ui/`) over the existing
+  repository/engine, using a sibling reference project (G-Stride, read-only
+  inspiration only) for visual/interaction patterns — see `docs/backlog.md` Epic 11
+  for the full component/endpoint list. `executor.py` gained dict/rows-based core
+  functions (`define_test_case_from_spec`, `run_test_case_with_rows`,
+  `run_chain_with_rows`) that the file-path CLI functions now delegate to, so the API
+  needs no temp YAML/CSV round-trips.
+- **Two real bugs fixed along the way, unrelated to the UI itself**: `message_patterns.
+  billing_saved`'s regex expected `"Billing document N has been saved"` but every real
+  billing save this session actually said `"Document N has been saved"` — fixed. And a
+  `DEFAULT_DB_PATH` "fix" I made initially had the direction backwards (changed it to
+  be `core/`-relative) — the project's actual convention (confirmed by every working
+  `core/examples/...` path in the README's own demos) is to run all `smt` commands
+  from the **repo root**; reverted to `core/data/repository.db`.
+- **First cut of the Module-scanning UI persisted every component on a screen (200+
+  attributes) with no way to pick and choose — directly corrected on user feedback.**
+  The desired interaction is a live element picker: launch the transaction, then
+  **Ctrl+Click each specific field/button directly in the real SAP GUI window** to
+  add it one at a time, until "stop scanning." This needed a new capability the agent
+  didn't have at all: detecting a real OS-level click and identifying which SAP
+  component was under it — SAP GUI Scripting has no "what's at this pixel" or
+  "notify me on click" API.
+  - **`proto/uiadapter.proto`**: new `PickedComponent` message + a dedicated streaming
+    RPC `StartElementPicker(SessionHandle) returns (stream PickedComponent)` — kept
+    separate from the existing `Subscribe`/`UiEvent` (statusbar-only today) rather
+    than overloading it. No separate "stop" RPC: the caller cancels the streaming
+    call itself (same convention `Subscribe` already uses via `CancellationToken`).
+  - **Regenerating the Python stubs changed `uiadapter_pb2_grpc.py`'s own import from
+    `from . import uiadapter_pb2` to a bare `import uiadapter_pb2`**, which breaks at
+    runtime (`ModuleNotFoundError`) — `grpc_tools.protoc` doesn't reproduce the
+    relative-import form the checked-in file has. Fixed by hand-patching that one
+    import line back after every regen; worth automating (a small sed step) if the
+    proto changes again.
+  - **Detection = polling, not a Windows hook**: `agent/SapGuiAgent/Native/
+    PointerWatch.cs` wraps `GetAsyncKeyState`/`GetCursorPos` (both new P/Invokes — the
+    codebase previously only had outbound `SetCursorPos`/`mouse_event` for
+    `COORDINATE_CLICK_FALLBACK`), and `ClickEdgeDetector.cs` turns continuous state
+    into a single edge-triggered event per physical click. `StartElementPicker`'s
+    server loop (mirroring `Subscribe`'s own 300ms-poll-inside-the-RPC-method shape)
+    polls every 40ms; only on a detected click edge does it dispatch onto the
+    session's STA thread to run a fresh `root_id="*"` scan (includes modals) and hit-
+    test (`ComponentHitTester.cs`: smallest-bounding-rect match over
+    `ScreenLeft/Top/Width/Height`, already computed per node by the existing
+    scanner — no new COM properties needed). A click outside this session's own SAP
+    window naturally hit-tests to nothing and is silently ignored — no separate
+    window-bounds pre-check needed.
+  - **FastAPI relays the stream to the browser via plain REST polling**
+    (`core/smt/api/capture.py`): a background thread drains the gRPC stream into a
+    per-capture in-memory buffer (deduped by component id), `/modules/capture/start`
+    `/poll` `/stop` — chosen over WebSocket/SSE to match the same "poll on an
+    interval" pattern already used for the connection-status pill, keeping this
+    MVP's transport surface small.
+  - **Verified live, for real**: repositioned the actual SAP GUI window (class
+    `SAP_FRONTEND_SESSION` — confirmed via `EnumWindows`+`GetClassName` that this is a
+    *different* top-level window than `saplogon.exe`'s own `Process.MainWindowHandle`,
+    which was the wrong window to move and cost some debugging time), then used raw
+    Win32 `keybd_event`/`mouse_event` (via inline C# in PowerShell) to simulate a real
+    Ctrl+Click at a field's exact live screen coordinates. The click was correctly
+    detected, hit-tested to the right component (`wnd[0]/usr/ctxtVBAK-AUART`, then
+    `...VKORG`), and streamed all the way through to a browser-facing poll response —
+    not simulated or mocked at any layer.
+  - **Known limitation, accepted for this MVP**: click detection is global Win32
+    input polling, not scoped by which window has OS focus — if two capture sessions
+    were ever running against the same SAP window at once, both would independently
+    pick up the same click. Fine for one operator driving one capture at a time (the
+    only way the UI itself can be used today), not specifically guarded against.

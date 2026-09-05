@@ -1,5 +1,5 @@
-import { Plus, Trash2, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { MousePointerClick, Plus, Trash2, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { api, ApiError } from "../../api";
 import type { ScannedComponentOut } from "../../types";
 
@@ -8,7 +8,7 @@ interface PrefillPair {
   value: string;
 }
 
-type Step = "configure" | "select";
+type Step = "configure" | "capturing" | "review";
 
 export function ScanModuleDialog({ onClose, onScanned }: { onClose: () => void; onScanned: () => void }) {
   const [step, setStep] = useState<Step>("configure");
@@ -21,97 +21,99 @@ export function ScanModuleDialog({ onClose, onScanned }: { onClose: () => void; 
   const [prefill, setPrefill] = useState<PrefillPair[]>([]);
   const [vkeys, setVkeys] = useState<string[]>([]);
 
-  // --- select step state ---
-  const [screenNumber, setScreenNumber] = useState("");
-  const [components, setComponents] = useState<ScannedComponentOut[]>([]);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  // --- capturing / review state ---
+  const [captureId, setCaptureId] = useState<string | null>(null);
+  const [picked, setPicked] = useState<ScannedComponentOut[]>([]);
   const [names, setNames] = useState<Record<string, string>>({});
-  const [filter, setFilter] = useState("");
+  const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const scan = async () => {
+  const mergeNew = (incoming: ScannedComponentOut[]) => {
+    if (incoming.length === 0) return;
+    setPicked((prev) => {
+      const known = new Set(prev.map((c) => c.component_id));
+      const fresh = incoming.filter((c) => !known.has(c.component_id));
+      return fresh.length ? [...prev, ...fresh] : prev;
+    });
+    setNames((prev) => {
+      const next = { ...prev };
+      for (const c of incoming) if (!(c.component_id in next)) next[c.component_id] = c.semantic_name;
+      return next;
+    });
+  };
+
+  useEffect(() => () => {
+    if (pollTimer.current) clearInterval(pollTimer.current);
+  }, []);
+
+  const startCapture = async () => {
     setBusy(true);
     setError(null);
     try {
-      const result = await api.scanPreview({
+      const result = await api.startCapture({
         tcode,
-        root_id: rootId,
         navigate,
         prefill: Object.fromEntries(prefill.filter((p) => p.componentId).map((p) => [p.componentId, p.value])),
         vkeys_before_scan: vkeys.filter(Boolean),
       });
-      setComponents(result.components);
-      setScreenNumber(result.screen_number);
-      setNames(Object.fromEntries(result.components.map((c) => [c.component_id, c.semantic_name])));
-      setSelected(new Set());
-      setStep("select");
+      setCaptureId(result.capture_id);
+      setPicked([]);
+      setNames({});
+      setStep("capturing");
+      pollTimer.current = setInterval(async () => {
+        try {
+          const poll = await api.pollCapture(result.capture_id);
+          mergeNew(poll.components);
+          if (poll.error) setError(poll.error);
+        } catch {
+          // transient poll failure — keep trying until the user stops
+        }
+      }, 500);
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Scan failed");
+      setError(e instanceof ApiError ? e.message : "Could not start capture");
     } finally {
       setBusy(false);
     }
   };
 
-  const groups = useMemo(() => {
-    const byWindow = new Map<string, ScannedComponentOut[]>();
-    for (const c of components) {
-      if (!byWindow.has(c.window)) byWindow.set(c.window, []);
-      byWindow.get(c.window)!.push(c);
+  const stopCapture = async () => {
+    if (!captureId) return;
+    setBusy(true);
+    setError(null);
+    if (pollTimer.current) {
+      clearInterval(pollTimer.current);
+      pollTimer.current = null;
     }
-    return [...byWindow.entries()].sort(([a], [b]) => a.localeCompare(b));
-  }, [components]);
-
-  const visible = (list: ScannedComponentOut[]) =>
-    !filter
-      ? list
-      : list.filter((c) => {
-          const needle = filter.toLowerCase();
-          return (
-            c.semantic_name.toLowerCase().includes(needle) ||
-            c.label.toLowerCase().includes(needle) ||
-            c.component_id.toLowerCase().includes(needle)
-          );
-        });
-
-  const toggle = (id: string) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+    try {
+      const result = await api.stopCapture(captureId);
+      mergeNew(result.components);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Could not stop capture");
+    } finally {
+      setBusy(false);
+      setStep("review");
+    }
   };
 
-  const toggleGroup = (list: ScannedComponentOut[], checked: boolean) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      for (const c of list) {
-        if (checked) next.add(c.component_id);
-        else next.delete(c.component_id);
-      }
-      return next;
-    });
+  const removePicked = (componentId: string) => {
+    setPicked((prev) => prev.filter((c) => c.component_id !== componentId));
   };
 
   const save = async () => {
     setBusy(true);
     setError(null);
     try {
-      const byId = new Map(components.map((c) => [c.component_id, c]));
-      const attributes = [...selected].map((id) => {
-        const c = byId.get(id)!;
-        return {
-          semantic_name: names[id] || c.semantic_name,
-          component_id: c.component_id,
-          sap_type: c.sap_type,
-          sap_sub_type: c.sap_sub_type,
-          label: c.label,
-          supported_action_modes: c.supported_action_modes,
-        };
-      });
-      await api.saveModule({ module_name: moduleName, tcode, root_id: rootId, screen_number: screenNumber, attributes });
+      const attributes = picked.map((c) => ({
+        semantic_name: names[c.component_id] || c.semantic_name,
+        component_id: c.component_id,
+        sap_type: c.sap_type,
+        sap_sub_type: c.sap_sub_type,
+        label: c.label,
+        supported_action_modes: c.supported_action_modes,
+      }));
+      await api.saveModule({ module_name: moduleName, tcode, root_id: rootId, attributes });
       onScanned();
       onClose();
     } catch (e) {
@@ -122,20 +124,26 @@ export function ScanModuleDialog({ onClose, onScanned }: { onClose: () => void; 
   };
 
   return (
-    <div className="dialog-backdrop" onClick={onClose}>
+    <div className="dialog-backdrop" onClick={step === "capturing" ? undefined : onClose}>
       <div
         className="dialog"
-        style={step === "select" ? { width: "min(920px, 96vw)" } : undefined}
+        style={step !== "configure" ? { width: "min(760px, 96vw)" } : undefined}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
         aria-labelledby="scan-title"
       >
         <div className="dialog-header">
-          <h3 id="scan-title">{step === "configure" ? "Scan a screen" : `Pick fields for "${moduleName}"`}</h3>
-          <button className="btn" aria-label="Close" onClick={onClose}>
-            <X size={16} />
-          </button>
+          <h3 id="scan-title">
+            {step === "configure" && "Pick fields from a screen"}
+            {step === "capturing" && "Capturing… Ctrl+Click fields in SAP"}
+            {step === "review" && `Review ${picked.length} captured field${picked.length === 1 ? "" : "s"}`}
+          </h3>
+          {step !== "capturing" && (
+            <button className="btn" aria-label="Close" onClick={onClose}>
+              <X size={16} />
+            </button>
+          )}
         </div>
         <div className="dialog-body">
           {error && <div className="error-banner">{error}</div>}
@@ -158,11 +166,11 @@ export function ScanModuleDialog({ onClose, onScanned }: { onClose: () => void; 
                 </div>
                 <div className="field">
                   <label>
-                    <input type="checkbox" checked={navigate} onChange={(e) => setNavigate(e.target.checked)} /> Navigate to the tcode before scanning
+                    <input type="checkbox" checked={navigate} onChange={(e) => setNavigate(e.target.checked)} /> Launch the transaction before capturing
                   </label>
                 </div>
                 <div className="field">
-                  <label>Prefill fields (set before scanning)</label>
+                  <label>Prefill fields (set before launching)</label>
                   {prefill.map((pair, i) => (
                     <div key={i} style={{ display: "flex", gap: 8, marginBottom: 4 }}>
                       <input
@@ -183,7 +191,7 @@ export function ScanModuleDialog({ onClose, onScanned }: { onClose: () => void; 
                   </button>
                 </div>
                 <div className="field">
-                  <label>VKeys to send before scanning (in order)</label>
+                  <label>VKeys to send before capturing (in order)</label>
                   {vkeys.map((v, i) => (
                     <div key={i} style={{ display: "flex", gap: 8, marginBottom: 4 }}>
                       <input type="text" value={v} onChange={(e) => setVkeys(vkeys.map((x, j) => (j === i ? e.target.value : x)))} />
@@ -200,85 +208,97 @@ export function ScanModuleDialog({ onClose, onScanned }: { onClose: () => void; 
             </>
           )}
 
-          {step === "select" && (
+          {step === "capturing" && (
             <>
-              <input
-                type="search"
-                placeholder="Filter by name, label, or component id…"
-                value={filter}
-                onChange={(e) => setFilter(e.target.value)}
-                style={{ width: "100%", marginBottom: 12 }}
-              />
-              <div className="breadcrumb" style={{ marginBottom: 12 }}>
-                {selected.size} of {components.length} selected
+              <div className="panel panel-body" style={{ marginBottom: 16, display: "flex", gap: 12, alignItems: "center" }}>
+                <MousePointerClick size={28} aria-hidden="true" />
+                <div>
+                  <strong>Switch to your SAP window</strong> and hold <kbd>Ctrl</kbd> while clicking each field,
+                  button, or control you want — it appears in the list below the moment you click it. Come back
+                  here and press "Stop scanning" when you're done.
+                </div>
               </div>
-              {groups.map(([window, list]) => {
-                const shown = visible(list);
-                if (shown.length === 0) return null;
-                const allChecked = shown.every((c) => selected.has(c.component_id));
-                return (
-                  <div key={window} style={{ marginBottom: 16 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                      <input
-                        type="checkbox"
-                        checked={allChecked}
-                        onChange={(e) => toggleGroup(shown, e.target.checked)}
-                        aria-label={`Select all fields in ${window}`}
-                      />
-                      <strong style={{ font: "var(--text-code)" }}>{window}</strong>
-                      <span className="breadcrumb">({shown.length})</span>
-                    </div>
-                    <div className="table-frame">
-                      <table className="data-table">
-                        <tbody>
-                          {shown.map((c) => (
-                            <tr key={c.component_id}>
-                              <td style={{ width: 1 }}>
-                                <input
-                                  type="checkbox"
-                                  checked={selected.has(c.component_id)}
-                                  onChange={() => toggle(c.component_id)}
-                                  aria-label={`Select ${c.component_id}`}
-                                />
-                              </td>
-                              <td>
-                                <input
-                                  type="text"
-                                  value={names[c.component_id] ?? c.semantic_name}
-                                  onChange={(e) => setNames({ ...names, [c.component_id]: e.target.value })}
-                                  style={{ border: "none", background: "transparent", font: "var(--text-code)", width: "100%" }}
-                                />
-                              </td>
-                              <td>{c.label}</td>
-                              <td className="breadcrumb">{c.sap_type}</td>
-                              <td style={{ font: "var(--text-code)" }}>{c.component_id}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                );
-              })}
+              <div className="breadcrumb" style={{ marginBottom: 8 }}>{picked.length} captured so far</div>
+              <div className="table-frame">
+                <table className="data-table">
+                  <tbody>
+                    {picked.map((c) => (
+                      <tr key={c.component_id}>
+                        <td style={{ font: "var(--text-code)" }}>{names[c.component_id] ?? c.semantic_name}</td>
+                        <td>{c.label}</td>
+                        <td className="breadcrumb">{c.sap_type}</td>
+                        <td style={{ font: "var(--text-code)" }}>{c.component_id}</td>
+                      </tr>
+                    ))}
+                    {picked.length === 0 && (
+                      <tr>
+                        <td className="empty-state">Waiting for your first Ctrl+Click…</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </>
+          )}
+
+          {step === "review" && (
+            <div className="table-frame">
+              <table className="data-table">
+                <tbody>
+                  {picked.map((c) => (
+                    <tr key={c.component_id}>
+                      <td style={{ width: 1 }}>
+                        <button className="drag-handle" aria-label={`Remove ${c.component_id}`} onClick={() => removePicked(c.component_id)}>
+                          <Trash2 size={14} />
+                        </button>
+                      </td>
+                      <td>
+                        <input
+                          type="text"
+                          value={names[c.component_id] ?? c.semantic_name}
+                          onChange={(e) => setNames({ ...names, [c.component_id]: e.target.value })}
+                          style={{ border: "none", background: "transparent", font: "var(--text-code)", width: "100%" }}
+                        />
+                      </td>
+                      <td>{c.label}</td>
+                      <td className="breadcrumb">{c.sap_type}</td>
+                      <td style={{ font: "var(--text-code)" }}>{c.component_id}</td>
+                    </tr>
+                  ))}
+                  {picked.length === 0 && (
+                    <tr>
+                      <td className="empty-state">Nothing captured — go back and try again.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
         <div className="dialog-footer">
-          {step === "select" && (
-            <button className="btn" onClick={() => setStep("configure")} disabled={busy}>
-              Back
+          {step === "review" && (
+            <button className="btn" onClick={() => setStep("capturing")} disabled={busy}>
+              Back to capturing
             </button>
           )}
-          <button className="btn" onClick={onClose}>
-            Cancel
-          </button>
-          {step === "configure" ? (
-            <button className="btn btn-primary" disabled={!moduleName || !tcode || busy} onClick={scan}>
-              {busy ? "Scanning…" : "Scan screen"}
+          {step !== "capturing" && (
+            <button className="btn" onClick={onClose}>
+              Cancel
             </button>
-          ) : (
-            <button className="btn btn-primary" disabled={selected.size === 0 || busy} onClick={save}>
-              {busy ? "Saving…" : `Save ${selected.size} selected as Module`}
+          )}
+          {step === "configure" && (
+            <button className="btn btn-primary" disabled={!moduleName || !tcode || busy} onClick={startCapture}>
+              {busy ? "Launching…" : "Launch & start picking"}
+            </button>
+          )}
+          {step === "capturing" && (
+            <button className="btn btn-danger" disabled={busy} onClick={stopCapture}>
+              Stop scanning
+            </button>
+          )}
+          {step === "review" && (
+            <button className="btn btn-primary" disabled={picked.length === 0 || busy} onClick={save}>
+              {busy ? "Saving…" : `Save ${picked.length} field${picked.length === 1 ? "" : "s"} as Module`}
             </button>
           )}
         </div>

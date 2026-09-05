@@ -19,6 +19,7 @@ from sqlalchemy.orm.exc import NoResultFound
 
 from smt.adapter.client import UiAgentClient
 from smt.adapter.port import UiAgentPort
+from smt.api.capture import ElementCaptureRegistry
 from smt.api.deps import ConnectionUnavailableError
 from smt.api.routers import connections, meta, modules, runs, test_cases
 from smt.repository.db import DEFAULT_DB_PATH, init_db, make_engine, make_session_factory
@@ -42,6 +43,7 @@ def create_app(
         app.state.session_factory = session_factory or _build_session_factory(db_path)
         app.state.agent = agent or UiAgentClient(target)
         app.state.owns_agent = agent is None
+        app.state.captures = ElementCaptureRegistry()
         yield
         if app.state.owns_agent and hasattr(app.state.agent, "close"):
             app.state.agent.close()

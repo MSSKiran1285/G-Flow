@@ -1,6 +1,7 @@
 using Grpc.Core;
 using SapGuiAgent.Com;
 using SapGuiAgent.Components;
+using SapGuiAgent.Native;
 using SapGuiAgent.Scanning;
 
 namespace SapGuiAgent.Grpc;
@@ -107,6 +108,53 @@ public sealed class UiAgentService : UiAgent.UiAgentBase
             try
             {
                 await Task.Delay(300, context.CancellationToken);
+            }
+            catch (TaskCanceledException)
+            {
+                break;
+            }
+        }
+    }
+
+    public override async Task StartElementPicker(SessionHandle request, IServerStreamWriter<PickedComponent> responseStream, ServerCallContext context)
+    {
+        var (session, sta) = RequireSession(request.SessionId);
+        var detector = new ClickEdgeDetector();
+        while (!context.CancellationToken.IsCancellationRequested)
+        {
+            if (detector.TryDetectClick(out var x, out var y))
+            {
+                var picked = await sta.RunAsync(() =>
+                {
+                    // root_id="*" so a click inside a modal popup (e.g. a completeness-check
+                    // dialog) hit-tests correctly too, same as any other full-tree scan.
+                    var snapshot = _scanner
+                        .ScanAsync(session, new ScanRequest { SessionId = session.Id, RootId = "*" }, context.CancellationToken)
+                        .GetAwaiter().GetResult();
+                    return ComponentHitTester.Find(snapshot.Root, x, y);
+                });
+
+                // null means the click landed outside this session's own SAP GUI window
+                // entirely (e.g. in the browser) — silently ignored, not an error.
+                if (picked is not null)
+                {
+                    await responseStream.WriteAsync(new PickedComponent
+                    {
+                        SessionId = session.Id,
+                        ComponentId = picked.Id,
+                        Type = picked.Type,
+                        SubType = picked.SubType,
+                        Family = picked.Family,
+                        Name = picked.Name,
+                        Text = picked.Text,
+                        Tooltip = picked.Tooltip,
+                    });
+                }
+            }
+
+            try
+            {
+                await Task.Delay(40, context.CancellationToken);
             }
             catch (TaskCanceledException)
             {

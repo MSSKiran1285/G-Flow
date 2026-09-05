@@ -9,6 +9,24 @@ from __future__ import annotations
 from smt.adapter.generated import uiadapter_pb2 as pb
 
 
+class FakePickerCall:
+    """Minimal stand-in for the real grpc streaming-call object StartElementPicker
+    returns: iterable, and supports .cancel() the way capture.py's stop() expects."""
+
+    def __init__(self, items: list[pb.PickedComponent]):
+        self._items = list(items)
+        self.cancelled = False
+
+    def __iter__(self):
+        for item in self._items:
+            if self.cancelled:
+                return
+            yield item
+
+    def cancel(self) -> None:
+        self.cancelled = True
+
+
 class FakeAgent:
     """Records every SET it receives, fails a chosen (component_id, op) combination on
     demand, serves scripted statusbar text (one entry per STATUSBAR_READ call, repeating
@@ -22,11 +40,14 @@ class FakeAgent:
         statusbar_texts: list[str] | None = None,
         connections: pb.ConnectionList | None = None,
         scan_result: pb.ScreenSnapshot | None = None,
+        picked_components: list[pb.PickedComponent] | None = None,
     ):
         self.fail_on = fail_on
         self.statusbar_texts = list(statusbar_texts) if statusbar_texts else ["Standard Order 999 has been saved"]
         self.connections = connections if connections is not None else pb.ConnectionList()
         self.scan_result = scan_result if scan_result is not None else pb.ScreenSnapshot()
+        self.picked_components = list(picked_components) if picked_components else []
+        self.last_picker_call: FakePickerCall | None = None
         self.sets: list[tuple[str, str]] = []
         self.sessions_opened = 0
         self.sessions_closed = 0
@@ -44,6 +65,10 @@ class FakeAgent:
 
     def scan_screen(self, request):
         return self.scan_result
+
+    def start_element_picker(self, handle):
+        self.last_picker_call = FakePickerCall(self.picked_components)
+        return self.last_picker_call
 
     def execute_action(self, request):
         if self.fail_on == (request.component_id, request.op):

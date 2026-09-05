@@ -28,6 +28,14 @@ service UiAgent {
   rpc Subscribe(SessionHandle) returns (stream UiEvent);
   rpc CaptureScreenshot(CaptureRequest) returns (ImageBlob);
   rpc GetOkCodeHistory(SessionHandle) returns (OkCodeHistory);
+
+  // Live element picker: while this call is open, the agent watches for a real
+  // Ctrl+Click anywhere on screen and, whenever one lands inside this session's own
+  // SAP GUI window, hit-tests a fresh scan against the click point and streams back
+  // whichever component was clicked (deepest/smallest match). The caller stops
+  // picking by cancelling this streaming call — there is no separate "stop" RPC,
+  // same cancellation-token convention as Subscribe.
+  rpc StartElementPicker(SessionHandle) returns (stream PickedComponent);
 }
 
 // ---------------------------------------------------------------------------
@@ -320,6 +328,20 @@ message ComponentNode {
   bool unmapped = 24;
   // "" | "unsupported" | "fragile" — see spec §11 coverage-honesty requirement.
   string coverage_status = 25;
+}
+
+// One component identified by a live Ctrl+Click during StartElementPicker — the
+// subset of ComponentNode's fields useful for building a Module attribute out of it.
+message PickedComponent {
+  string contract_version = 1;
+  string session_id = 2;
+  string component_id = 3;
+  string type = 4;
+  string sub_type = 5;
+  ComponentFamily family = 6;
+  string name = 7;
+  string text = 8;
+  string tooltip = 9;
 }
 
 message ScreenSnapshot {

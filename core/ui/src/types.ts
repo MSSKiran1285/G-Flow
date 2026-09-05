@@ -96,6 +96,28 @@ export interface SaveModuleRequest {
   attributes: SelectedAttribute[];
 }
 
+export interface StartCaptureRequest {
+  tcode: string;
+  navigate?: boolean;
+  prefill?: Record<string, string>;
+  vkeys_before_scan?: string[];
+  connection_id?: string | null;
+}
+
+export interface StartCaptureResponse {
+  capture_id: string;
+}
+
+export interface PollCaptureResponse {
+  components: ScannedComponentOut[];
+  active: boolean;
+  error?: string | null;
+}
+
+export interface StopCaptureResponse {
+  components: ScannedComponentOut[];
+}
+
 export type BindingType = "literal" | "column" | "buffer";
 
 export interface BindingSpec {

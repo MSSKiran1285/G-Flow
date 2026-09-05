@@ -4,6 +4,7 @@ import type {
   DefinedTestCaseOut,
   ModuleDetail,
   ModuleSummary,
+  PollCaptureResponse,
   RunChainResponse,
   RunTestCaseResponse,
   SaveModuleRequest,
@@ -11,6 +12,9 @@ import type {
   ScanModuleResponse,
   ScanPreviewRequest,
   ScanPreviewResponse,
+  StartCaptureRequest,
+  StartCaptureResponse,
+  StopCaptureResponse,
   TestCaseDetail,
   TestCaseSpec,
   TestCaseSummary,
@@ -49,6 +53,12 @@ export const api = {
     request<ScanPreviewResponse>("/api/modules/scan-preview", { method: "POST", body: JSON.stringify(body) }),
   saveModule: (body: SaveModuleRequest) =>
     request<ScanModuleResponse>("/api/modules", { method: "POST", body: JSON.stringify(body) }),
+  startCapture: (body: StartCaptureRequest) =>
+    request<StartCaptureResponse>("/api/modules/capture/start", { method: "POST", body: JSON.stringify(body) }),
+  pollCapture: (captureId: string) =>
+    request<PollCaptureResponse>(`/api/modules/capture/${encodeURIComponent(captureId)}/poll`),
+  stopCapture: (captureId: string) =>
+    request<StopCaptureResponse>(`/api/modules/capture/${encodeURIComponent(captureId)}/stop`, { method: "POST" }),
 
   listTestCases: () => request<TestCaseSummary[]>("/api/test-cases"),
   getTestCase: (name: string) => request<TestCaseDetail>(`/api/test-cases/${encodeURIComponent(name)}`),

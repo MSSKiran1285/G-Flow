@@ -9,6 +9,7 @@ from fastapi import Request
 from sqlalchemy.orm import Session, sessionmaker
 
 from smt.adapter.port import UiAgentPort
+from smt.api.capture import ElementCaptureRegistry
 
 
 class ConnectionUnavailableError(RuntimeError):
@@ -21,6 +22,10 @@ def get_session_factory(request: Request) -> sessionmaker[Session]:
 
 def get_agent(request: Request) -> UiAgentPort:
     return request.app.state.agent
+
+
+def get_capture_registry(request: Request) -> ElementCaptureRegistry:
+    return request.app.state.captures
 
 
 def resolve_connection_id(agent: UiAgentPort, connection_id: str | None) -> str:

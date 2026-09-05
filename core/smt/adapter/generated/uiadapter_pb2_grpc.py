@@ -93,6 +93,11 @@ class UiAgentStub:
                 request_serializer=uiadapter__pb2.SessionHandle.SerializeToString,
                 response_deserializer=uiadapter__pb2.OkCodeHistory.FromString,
                 _registered_method=True)
+        self.StartElementPicker = channel.unary_stream(
+                '/smt.uiadapter.v1.UiAgent/StartElementPicker',
+                request_serializer=uiadapter__pb2.SessionHandle.SerializeToString,
+                response_deserializer=uiadapter__pb2.PickedComponent.FromString,
+                _registered_method=True)
 
 
 class UiAgentServicer:
@@ -170,6 +175,18 @@ class UiAgentServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def StartElementPicker(self, request, context):
+        """Live element picker: while this call is open, the agent watches for a real
+        Ctrl+Click anywhere on screen and, whenever one lands inside this session's own
+        SAP GUI window, hit-tests a fresh scan against the click point and streams back
+        whichever component was clicked (deepest/smallest match). The caller stops
+        picking by cancelling this streaming call — there is no separate "stop" RPC,
+        same cancellation-token convention as Subscribe.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_UiAgentServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -227,6 +244,11 @@ def add_UiAgentServicer_to_server(servicer, server):
                     servicer.GetOkCodeHistory,
                     request_deserializer=uiadapter__pb2.SessionHandle.FromString,
                     response_serializer=uiadapter__pb2.OkCodeHistory.SerializeToString,
+            ),
+            'StartElementPicker': grpc.unary_stream_rpc_method_handler(
+                    servicer.StartElementPicker,
+                    request_deserializer=uiadapter__pb2.SessionHandle.FromString,
+                    response_serializer=uiadapter__pb2.PickedComponent.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -530,6 +552,33 @@ class UiAgent:
             '/smt.uiadapter.v1.UiAgent/GetOkCodeHistory',
             uiadapter__pb2.SessionHandle.SerializeToString,
             uiadapter__pb2.OkCodeHistory.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def StartElementPicker(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_stream(
+            request,
+            target,
+            '/smt.uiadapter.v1.UiAgent/StartElementPicker',
+            uiadapter__pb2.SessionHandle.SerializeToString,
+            uiadapter__pb2.PickedComponent.FromString,
             options,
             channel_credentials,
             insecure,
