@@ -53,7 +53,7 @@ public class TableControlHandlerTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_row_cell_ops_fail_honestly_not_yet_implemented()
+    public async Task ExecuteAsync_still_unsupported_ops_fail_honestly()
     {
         var component = BuildTable(new FakeTableControlNative());
 
@@ -62,5 +62,72 @@ public class TableControlHandlerTests
 
         Assert.False(result.Success);
         Assert.Contains("GuiTableControl", result.UnsupportedReason);
+    }
+
+    [Fact]
+    public async Task TableGetCell_reads_the_requested_absolute_row_and_column()
+    {
+        var native = new FakeTableControlNative();
+        native.GetAbsoluteRow(3).Item(1).Text = "TG-0007";
+        var component = BuildTable(native);
+
+        var result = await new TableControlHandler().ExecuteAsync(
+            component,
+            new ActionRequest { ComponentId = component.Id, Op = ActionOp.TableGetCell, Params = new ActionParams { Row = 3, ColumnId = "1" } },
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal("TG-0007", result.ActualValue);
+    }
+
+    [Fact]
+    public async Task TableSetCell_writes_the_value_and_returns_it_back()
+    {
+        var native = new FakeTableControlNative();
+        var component = BuildTable(native);
+
+        var result = await new TableControlHandler().ExecuteAsync(
+            component,
+            new ActionRequest
+            {
+                ComponentId = component.Id, Op = ActionOp.TableSetCell,
+                Params = new ActionParams { Row = 5, ColumnId = "2", TextValue = "10" },
+            },
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal("10", result.ActualValue);
+        Assert.Equal("10", native.GetAbsoluteRow(5).Item(2).Text);
+    }
+
+    [Fact]
+    public async Task TableGetCell_and_TableSetCell_address_different_rows_independently()
+    {
+        // The whole point of runtime row addressing: the same column/component_id (the
+        // table control itself), different `row` params, must not collide — this is what
+        // makes a data-driven multi-line-item test case possible.
+        var native = new FakeTableControlNative();
+        var component = BuildTable(native);
+
+        await new TableControlHandler().ExecuteAsync(
+            component,
+            new ActionRequest { ComponentId = component.Id, Op = ActionOp.TableSetCell, Params = new ActionParams { Row = 0, ColumnId = "1", TextValue = "MAT-A" } },
+            CancellationToken.None);
+        await new TableControlHandler().ExecuteAsync(
+            component,
+            new ActionRequest { ComponentId = component.Id, Op = ActionOp.TableSetCell, Params = new ActionParams { Row = 1, ColumnId = "1", TextValue = "MAT-B" } },
+            CancellationToken.None);
+
+        var row0 = await new TableControlHandler().ExecuteAsync(
+            component,
+            new ActionRequest { ComponentId = component.Id, Op = ActionOp.TableGetCell, Params = new ActionParams { Row = 0, ColumnId = "1" } },
+            CancellationToken.None);
+        var row1 = await new TableControlHandler().ExecuteAsync(
+            component,
+            new ActionRequest { ComponentId = component.Id, Op = ActionOp.TableGetCell, Params = new ActionParams { Row = 1, ColumnId = "1" } },
+            CancellationToken.None);
+
+        Assert.Equal("MAT-A", row0.ActualValue);
+        Assert.Equal("MAT-B", row1.ActualValue);
     }
 }

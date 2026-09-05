@@ -10,6 +10,7 @@ from smt.adapter.port import UiAgentPort
 from smt.api.capture import ElementCaptureRegistry
 from smt.api.deps import get_agent, get_capture_registry, get_session_factory, resolve_connection_id
 from smt.api.schemas import (
+    HighlightComponentRequest,
     HighlightRequest,
     HighlightResponse,
     ModuleAttributeOut,
@@ -134,6 +135,30 @@ def save_module_endpoint(
         screen_number=body.screen_number, attributes=[a.model_dump() for a in body.attributes],
     )
     return ScanModuleResponse(module_id=module_id, module_name=body.module_name, attribute_count=count)
+
+
+@router.post("/modules/highlight", response_model=HighlightResponse)
+def highlight_component_endpoint(
+    body: HighlightComponentRequest,
+    agent: UiAgentPort = Depends(get_agent),
+) -> HighlightResponse:
+    """Draws a colored border around `component_id` on the real, live SAP GUI screen —
+    for a saved Module's attribute (ModuleDetailView) or a field still in the review
+    step, neither of which has an active capture session to reuse a handle from (see
+    /modules/capture/{id}/highlight for that case). Opens a short-lived session just
+    for this one action and closes it when done — safe now that close_session no
+    longer touches the real window (see CloseSessionAsync)."""
+    connection_id = resolve_connection_id(agent, body.connection_id)
+    handle = agent.open_session(pb.OpenSessionRequest(connection_id=connection_id))
+    try:
+        result = agent.execute_action(pb.ActionRequest(
+            session_id=handle.session_id, component_id=body.component_id, op=pb.HIGHLIGHT,
+        ))
+    finally:
+        agent.close_session(handle)
+    if not result.success:
+        raise HTTPException(status_code=400, detail=result.error_message or "highlight failed")
+    return HighlightResponse()
 
 
 @router.post("/modules/capture/start", response_model=StartCaptureResponse)

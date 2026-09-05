@@ -64,6 +64,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ component_id: componentId }),
     }),
+  highlightComponent: (componentId: string, connectionId?: string) =>
+    request<{ success: boolean }>("/api/modules/highlight", {
+      method: "POST",
+      body: JSON.stringify({ component_id: componentId, connection_id: connectionId ?? null }),
+    }),
 
   listTestCases: () => request<TestCaseSummary[]>("/api/test-cases"),
   getTestCase: (name: string) => request<TestCaseDetail>(`/api/test-cases/${encodeURIComponent(name)}`),

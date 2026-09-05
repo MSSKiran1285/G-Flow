@@ -1,5 +1,6 @@
+import { Crosshair } from "lucide-react";
 import { Fragment, useEffect, useState } from "react";
-import { api } from "../../api";
+import { api, ApiError } from "../../api";
 import type { ModuleAttributeOut, ModuleDetail } from "../../types";
 
 function windowIdOf(componentId: string): string {
@@ -26,11 +27,25 @@ function groupByWindow(attributes: ModuleAttributeOut[]): [string, ModuleAttribu
 export function ModuleDetailView({ name }: { name: string }) {
   const [detail, setDetail] = useState<ModuleDetail | null>(null);
   const [filter, setFilter] = useState("");
+  const [highlighting, setHighlighting] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setDetail(null);
     api.getModule(name).then(setDetail).catch(() => setDetail(null));
   }, [name]);
+
+  const highlight = async (componentId: string) => {
+    setHighlighting(componentId);
+    setError(null);
+    try {
+      await api.highlightComponent(componentId);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Could not highlight that field");
+    } finally {
+      setHighlighting(null);
+    }
+  };
 
   if (!detail) return <p className="empty-state">Loading…</p>;
 
@@ -51,6 +66,7 @@ export function ModuleDetailView({ name }: { name: string }) {
         <span className="breadcrumb">{detail.tcode} · {detail.attribute_count} attributes</span>
       </div>
       <div className="panel-body">
+        {error && <div className="error-banner">{error}</div>}
         <input
           type="search"
           placeholder="Filter attributes by name, English name, or value…"
@@ -62,6 +78,7 @@ export function ModuleDetailView({ name }: { name: string }) {
           <table className="data-table">
             <thead>
               <tr>
+                <th />
                 <th>Semantic name</th>
                 <th>English name</th>
                 <th>Value</th>
@@ -73,10 +90,21 @@ export function ModuleDetailView({ name }: { name: string }) {
               {groupByWindow(attributes).map(([windowTitle, rows]) => (
                 <Fragment key={windowTitle}>
                   <tr className="table-group-row">
-                    <td colSpan={5}>{windowTitle}</td>
+                    <td colSpan={6}>{windowTitle}</td>
                   </tr>
                   {rows.map((a) => (
                     <tr key={a.id}>
+                      <td style={{ width: 1 }}>
+                        <button
+                          className="drag-handle"
+                          aria-label={`Highlight ${a.component_id} on screen`}
+                          title="Highlight this field on the live SAP screen"
+                          disabled={highlighting === a.component_id}
+                          onClick={() => highlight(a.component_id)}
+                        >
+                          <Crosshair size={14} />
+                        </button>
+                      </td>
                       <td>{a.semantic_name}</td>
                       <td>{a.caption || <span className="breadcrumb">—</span>}</td>
                       <td>{a.label}</td>

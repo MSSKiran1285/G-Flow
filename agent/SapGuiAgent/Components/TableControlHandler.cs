@@ -5,11 +5,16 @@ using SapGuiAgent.Grpc;
 namespace SapGuiAgent.Components;
 
 /// <summary>GuiTableControl (classic dynpro table, e.g. VA01's item overview — distinct from
-/// the GuiShell/GridView ALV grid AlvGridHandler covers) — read-only column-title metadata on
-/// scan for M1, so a table cell's caption can resolve to its real column header (e.g.
-/// RV45A-MABNR's column title "Material") instead of nothing. Row/cell get-set ops are M2
-/// scope (spec §5 coverage matrix) — still unimplemented here, same as before this handler
-/// existed.</summary>
+/// the GuiShell/GridView ALV grid AlvGridHandler covers). Column-title metadata on scan (so a
+/// table cell's caption can resolve to its real column header, e.g. RV45A-MABNR's column title
+/// "Material"), plus absolute-row cell get/set: a captured attribute's own component_id always
+/// encodes ONE specific row (e.g. "...[1,3]" — confirmed live, a scanned/picked cell is whatever
+/// row happened to be visible at capture time), so driving a data-driven test across N order
+/// lines needs the ROW supplied at runtime instead — TABLE_GET_CELL/TABLE_SET_CELL take the
+/// table control itself as the target component_id, with the row (ActionParams.row) and column
+/// index (ActionParams.column_id, stringified — GuiTableColumn has no documented technical-name
+/// property to key by, only display order) supplied per call, mirroring how ALV grid ops already
+/// work in AlvGridHandler.</summary>
 public sealed class TableControlHandler : ComponentHandlerBase, ITableControlHandler
 {
     public override ComponentFamily Family => ComponentFamily.FamilyTableControl;
@@ -43,7 +48,40 @@ public sealed class TableControlHandler : ComponentHandlerBase, ITableControlHan
 
     protected override Task<ActionResult> ExecuteCoreAsync(IComComponent component, ActionRequest request, CancellationToken ct)
     {
-        throw new UnsupportedOperationException(
-            "GuiTableControl row/cell ops not implemented yet (planned for M2 — see spec §5 coverage matrix)");
+        var native = new ComHandle(component.Native);
+        switch (request.Op)
+        {
+            case ActionOp.TableGetCell:
+            {
+                var value = GetCellText(native, request.Params.Row, request.Params.ColumnId);
+                return Task.FromResult(new ActionResult { Success = true, ActualValue = value });
+            }
+            case ActionOp.TableSetCell:
+            {
+                SetCellText(native, request.Params.Row, request.Params.ColumnId, request.Params.TextValue);
+                var actual = GetCellText(native, request.Params.Row, request.Params.ColumnId);
+                return Task.FromResult(new ActionResult { Success = true, ActualValue = actual });
+            }
+            default:
+                throw new UnsupportedOperationException(
+                    $"GuiTableControl does not support {request.Op} yet (planned for M2 — see spec §5 coverage matrix)");
+        }
     }
+
+    // VERIFY-ON-TARGET: GuiTableControl.GetAbsoluteRow(int) — returns the GuiTableRow for a
+    // given 0-based absolute row index, scrolling the table into view internally if needed
+    // (so callers never have to do their own scroll math). GuiTableRow.Item(columnIndex) then
+    // returns that row's cell as a plain GuiComponent (GuiCTextField/GuiTextField/...), on
+    // which .Text reads/writes the value directly like any other text-input control.
+    private static ComHandle GetCell(ComHandle table, int row, string columnId)
+    {
+        var columnIndex = int.Parse(columnId);
+        return table.CallCom("GetAbsoluteRow", row).CallCom("Item", columnIndex);
+    }
+
+    private static string GetCellText(ComHandle table, int row, string columnId) =>
+        GetCell(table, row, columnId).GetString("Text");
+
+    private static void SetCellText(ComHandle table, int row, string columnId, string value) =>
+        GetCell(table, row, columnId).Set("Text", value);
 }

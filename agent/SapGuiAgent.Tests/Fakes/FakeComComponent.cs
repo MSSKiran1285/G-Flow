@@ -60,11 +60,26 @@ public sealed class FakeTableColumnCollection
     public void Add(FakeTableColumn c) => _items.Add(c);
 }
 
+public sealed class FakeTableCell
+{
+    public string Text { get; set; } = "";
+}
+
+public sealed class FakeTableRow
+{
+    private readonly Dictionary<int, FakeTableCell> _cells = new();
+    public FakeTableCell Item(int columnIndex) =>
+        _cells.TryGetValue(columnIndex, out var cell) ? cell : _cells[columnIndex] = new FakeTableCell();
+}
+
 public sealed class FakeTableControlNative
 {
     public int RowCount { get; set; }
     public int VisibleRowCount { get; set; }
     public FakeTableColumnCollection Columns { get; } = new();
+    private readonly Dictionary<int, FakeTableRow> _rows = new();
+    public FakeTableRow GetAbsoluteRow(int row) =>
+        _rows.TryGetValue(row, out var r) ? r : _rows[row] = new FakeTableRow();
 }
 
 public sealed class FakeGridViewNative

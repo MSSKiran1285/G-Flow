@@ -151,6 +151,11 @@ class HighlightResponse(BaseModel):
     success: bool = True
 
 
+class HighlightComponentRequest(BaseModel):
+    component_id: str
+    connection_id: str | None = None
+
+
 # --- test cases ---
 
 def _is_known_action(name: str) -> bool:

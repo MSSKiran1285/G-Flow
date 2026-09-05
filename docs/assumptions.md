@@ -647,3 +647,40 @@ Per spec §13, recorded here rather than re-confirmed inline.
     blocked until the session regains interactive cursor control; the caching
     logic itself is unit-tested and the surrounding features (window_title,
     highlight, captions) were all confirmed via non-cursor-dependent live calls.
+- **Root-caused, for real this time: the recurring stray "Log Off" dialogs.** User
+  feedback ("stop scanning tries to exit SAP") led straight to it:
+  `SapGuiConnectionManager.CloseSessionAsync` called `wnd[0].FindById("wnd[0]").Close()`
+  on *every* `close_session` — and `close_session` is called after every single
+  scan/capture/mining call and after every data row of every test run
+  (`executor.py`'s `_run_one_row`), always against the *same real, already-open*
+  session (`open_session(connection_id=...)` attaches to whatever's already there —
+  `GuiSession.Id` is the real session id, not a synthetic per-request one). So every
+  one of those calls was closing the live window the user (or a chain of test rows)
+  was actively using — the actual cause of the stacked "Log Off" confirmations seen
+  repeatedly throughout this project's own live testing, not primarily the earlier
+  cursor/OS-click theory (that was a real, separate finding, but a red herring for
+  *this* symptom). Fixed by simply not calling `.Close()` at all — `close_session`
+  now only releases the server's own STA-thread tracking of the handle, exactly what
+  every caller actually needs ("I'm done with this handle"), leaving the real SAP GUI
+  window exactly as the user left it. Live-verified: started and stopped a capture
+  session, confirmed via a fresh scan that the session was still on the exact same
+  screen with no extra windows.
+- **Implemented real `TABLE_GET_CELL`/`TABLE_SET_CELL`** for `GuiTableControl`
+  (`TableControlHandler.ExecuteCoreAsync`), closing the gap raised by the same
+  feedback round ("table fields are identified as text fields, how will this be
+  resolved during execution?") — a captured table-cell attribute's component_id
+  always encodes one specific row (whatever was visible at capture time), so a
+  data-driven test across multiple order lines needs the row supplied at runtime
+  instead. Uses `GuiTableControl.GetAbsoluteRow(row).Item(columnIndex)` — column
+  index (not a technical name; `GuiTableColumn` has no documented name property) is
+  passed via the existing `ActionParams.column_id`, stringified, same shape ALV grid
+  ops already use. Live-verified against VA01's item overview table: wrote "5" to
+  row 0's quantity column and "12" to row 1's, read both back independently and
+  correctly — the write to row 1 didn't disturb row 0.
+- **Added a highlight endpoint that doesn't need an active capture session**
+  (`POST /modules/highlight`) — the capture-scoped one only helps while a picker
+  session is open; `ModuleDetailView` (a saved Module) and `ScanModuleDialog`'s
+  review step (by which point "Stop scanning" has already released the capture
+  session) had no way to highlight at all. Opens a short-lived session, highlights,
+  closes it — safe to do this freely now that `close_session` no longer touches the
+  real window. Live-verified against the real item overview table control.

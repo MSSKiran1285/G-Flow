@@ -120,10 +120,16 @@ export function ScanModuleDialog({ onClose, onScanned }: { onClose: () => void; 
 
   const [highlighting, setHighlighting] = useState<string | null>(null);
   const highlight = async (componentId: string) => {
-    if (!captureId) return;
     setHighlighting(componentId);
     try {
-      await api.highlightCapture(captureId, componentId);
+      // The capturing step's session is still open — reuse its handle. By the review
+      // step, "Stop scanning" has already closed it, so highlighting there opens a
+      // short-lived session of its own instead (same one ModuleDetailView uses).
+      if (step === "capturing" && captureId) {
+        await api.highlightCapture(captureId, componentId);
+      } else {
+        await api.highlightComponent(componentId);
+      }
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Could not highlight that field");
     } finally {
@@ -308,6 +314,7 @@ export function ScanModuleDialog({ onClose, onScanned }: { onClose: () => void; 
                 <thead>
                   <tr>
                     <th />
+                    <th />
                     <th>Name</th>
                     <th>English name</th>
                     <th>Value</th>
@@ -319,10 +326,21 @@ export function ScanModuleDialog({ onClose, onScanned }: { onClose: () => void; 
                   {groupByWindow(picked).map(([windowTitle, rows]) => (
                     <Fragment key={windowTitle}>
                       <tr className="table-group-row">
-                        <td colSpan={6}>{windowTitle}</td>
+                        <td colSpan={7}>{windowTitle}</td>
                       </tr>
                       {rows.map((c) => (
                         <tr key={c.component_id}>
+                          <td style={{ width: 1 }}>
+                            <button
+                              className="drag-handle"
+                              aria-label={`Highlight ${c.component_id} on screen`}
+                              title="Highlight this field on the live SAP screen"
+                              disabled={highlighting === c.component_id}
+                              onClick={() => highlight(c.component_id)}
+                            >
+                              <Crosshair size={14} />
+                            </button>
+                          </td>
                           <td style={{ width: 1 }}>
                             <button className="drag-handle" aria-label={`Remove ${c.component_id}`} onClick={() => removePicked(c.component_id)}>
                               <Trash2 size={14} />

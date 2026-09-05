@@ -240,6 +240,29 @@ def test_save_module_persists_only_the_curated_selection(client):
     assert detail["attributes"][0]["supported_action_modes"] == ["SET", "READ"]
 
 
+def test_highlight_component_opens_a_session_calls_highlight_and_closes_it(client):
+    c, agent = client
+
+    r = c.post("/api/modules/highlight", json={"component_id": "wnd[0]/usr/ctxtVBAK-AUART", "connection_id": "conn1"})
+
+    assert r.status_code == 200
+    assert r.json() == {"success": True}
+    assert agent.sessions_opened == 1
+    assert agent.sessions_closed == 1
+
+
+def test_highlight_component_surfaces_an_agent_failure_as_400(client):
+    c, agent = client
+    agent.fail_on = ("wnd[0]/usr/ctxtDOES-NOT-EXIST", pb.HIGHLIGHT)
+
+    r = c.post("/api/modules/highlight", json={"component_id": "wnd[0]/usr/ctxtDOES-NOT-EXIST", "connection_id": "conn1"})
+
+    assert r.status_code == 400
+    assert "boom" in r.json()["detail"]
+    # even on failure, the short-lived session is still closed, not leaked
+    assert agent.sessions_closed == 1
+
+
 def test_scan_module_persists_a_new_module(client):
     c, agent = client
 

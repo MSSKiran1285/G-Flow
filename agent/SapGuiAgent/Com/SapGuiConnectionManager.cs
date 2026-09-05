@@ -153,16 +153,17 @@ public sealed class SapGuiConnectionManager
         {
             return Task.FromResult(new Ack { Success = false, Message = $"unknown session '{sessionId}'" });
         }
+        // Deliberately does NOT call wnd[0].Close() (an earlier, never-verified attempt did,
+        // and it was wrong): `session.Id` is the *real* GuiSession.Id, not a synthetic
+        // per-request id, so open_session(connection_id=...) always attaches to the same
+        // live session a real person may already be looking at and working in — closing
+        // that window mid-use is destructive, not cleanup. Confirmed live: this is what was
+        // producing the recurring stacked "Log Off" dialogs seen throughout this project's
+        // own testing (every scan/capture/test-run call closes its session when done).
+        // "Close" a session here only ever means "we're done with this handle" — release our
+        // own STA thread, leave the real SAP GUI window exactly as the user left it.
         return entry.Sta.RunAsync(() =>
         {
-            try
-            {
-                new ComHandle(entry.Session.Native).CallCom("FindById", "wnd[0]").Call("Close"); // VERIFY-ON-TARGET
-            }
-            catch
-            {
-                // Session may already be gone (e.g. server-side timeout) — closing is best-effort.
-            }
             entry.Sta.Dispose();
             return new Ack { Success = true };
         });
