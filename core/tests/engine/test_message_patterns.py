@@ -13,6 +13,12 @@ def test_extract_delivery_saved_matches_the_real_outbound_delivery_wording():
     assert extract("delivery_saved", "Outbound Delivery 80001138 has been saved") == "80001138"
 
 
+def test_extract_billing_saved_matches_the_real_document_wording():
+    # Confirmed live: VF01's real statusbar text is "Document N has been saved", not
+    # "Billing document N has been saved" as originally guessed.
+    assert extract("billing_saved", "Document 90001005 has been saved") == "90001005"
+
+
 def test_extract_returns_none_when_the_text_does_not_match():
     assert extract("order_saved", "Please enter a value") is None
 

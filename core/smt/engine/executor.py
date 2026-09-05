@@ -36,8 +36,16 @@ class DefinedTestCase:
 def define_test_case(session_factory: sessionmaker[Session], yaml_path: Path | str) -> DefinedTestCase:
     """Imports a YAML test-case definition into the repository. Re-importing a name
     already present replaces it — the YAML is the human-editable source, the DB row is
-    the actual persisted asset (what a future UI would read/write directly)."""
+    the actual persisted asset (what the UI reads/writes directly via define_test_case_from_spec)."""
     spec = yaml.safe_load(Path(yaml_path).read_text(encoding="utf-8"))
+    return define_test_case_from_spec(session_factory, spec)
+
+
+def define_test_case_from_spec(session_factory: sessionmaker[Session], spec: dict) -> DefinedTestCase:
+    """Same as define_test_case, starting from an already-parsed spec dict — what the
+    API uses directly so a JSON request body never has to round-trip through a temp
+    YAML file. `spec` shape: {name, description?, steps: [{module?, attribute?,
+    component_id?, action, bind: "type:value", optional?, capture?: {buffer, pattern?}}]}."""
     with session_factory() as db:
         existing = db.query(TestCase).filter_by(name=spec["name"]).one_or_none()
         if existing:
@@ -186,6 +194,27 @@ def _read_rows(sheet_path: Path | str) -> list[dict[str, str]]:
         return list(csv.DictReader(f))
 
 
+def run_test_case_with_rows(
+    agent: UiAgentPort,
+    session_factory: sessionmaker[Session],
+    test_case_name: str,
+    rows: list[dict[str, str]],
+    connection_id: str,
+) -> list[RowResult]:
+    """Same as run_test_case, taking already-loaded rows directly — what the API uses so
+    an inline data grid never has to round-trip through a temp CSV file."""
+    with session_factory() as db:
+        resolved = _resolve_steps(db, test_case_name)
+
+    results: list[RowResult] = []
+    for row_index, row in enumerate(rows):
+        result = _run_one_row(agent, resolved, row, connection_id, buffer={}, test_case_name=test_case_name)
+        result.row_index = row_index
+        results.append(result)
+
+    return results
+
+
 def run_test_case(
     agent: UiAgentPort,
     session_factory: sessionmaker[Session],
@@ -193,16 +222,40 @@ def run_test_case(
     sheet_path: Path | str,
     connection_id: str,
 ) -> list[RowResult]:
+    return run_test_case_with_rows(agent, session_factory, test_case_name, _read_rows(sheet_path), connection_id)
+
+
+def run_chain_with_rows(
+    agent: UiAgentPort,
+    session_factory: sessionmaker[Session],
+    chain: list[tuple[str, list[dict[str, str]]]],
+    connection_id: str,
+) -> list[list[RowResult]]:
+    """Same as run_chain, taking already-loaded rows per stage directly — what the API
+    uses so a Chain builder's per-stage data grids never have to round-trip through temp
+    CSV files. Stops a row's chain at the first failing TestCase — later stages would
+    just be missing the buffer value they need anyway."""
     with session_factory() as db:
-        resolved = _resolve_steps(db, test_case_name)
+        resolved_by_case = [(name, _resolve_steps(db, name)) for name, _ in chain]
 
-    results: list[RowResult] = []
-    for row_index, row in enumerate(_read_rows(sheet_path)):
-        result = _run_one_row(agent, resolved, row, connection_id, buffer={}, test_case_name=test_case_name)
-        result.row_index = row_index
-        results.append(result)
+    row_counts = {len(rows) for _, rows in chain}
+    if len(row_counts) > 1:
+        raise ValueError(f"chain stages have mismatched row counts: {row_counts} — every stage needs one row per chain run")
+    num_rows = row_counts.pop() if row_counts else 0
 
-    return results
+    all_results: list[list[RowResult]] = []
+    for row_index in range(num_rows):
+        buffer: dict[str, str] = {}
+        row_results: list[RowResult] = []
+        for (test_case_name, resolved), (_, rows) in zip(resolved_by_case, chain):
+            result = _run_one_row(agent, resolved, rows[row_index], connection_id, buffer, test_case_name)
+            result.row_index = row_index
+            row_results.append(result)
+            if not result.success:
+                break
+        all_results.append(row_results)
+
+    return all_results
 
 
 def run_chain(
@@ -215,29 +268,5 @@ def run_chain(
     all of them — e.g. [(VA01_CreateStandardOrder, orders.csv), (VL01N_CreateDelivery,
     deliveries.csv), (VF01_CreateBilling, billing.csv)] lets the order number VA01 creates
     feed VL01N, and the delivery number VL01N creates feed VF01. Row i of every sheet is
-    assumed to belong to the same logical chain run; sheets must have equal row counts.
-    Stops a row's chain at the first failing TestCase — later ones in the chain would just
-    be missing the buffer value they need anyway.
-    """
-    with session_factory() as db:
-        resolved_by_case = [(name, _resolve_steps(db, name)) for name, _ in chain]
-
-    rows_by_case = [_read_rows(sheet) for _, sheet in chain]
-    row_counts = {len(rows) for rows in rows_by_case}
-    if len(row_counts) > 1:
-        raise ValueError(f"chain sheets have mismatched row counts: {row_counts} — every sheet needs one row per chain run")
-    num_rows = row_counts.pop() if row_counts else 0
-
-    all_results: list[list[RowResult]] = []
-    for row_index in range(num_rows):
-        buffer: dict[str, str] = {}
-        row_results: list[RowResult] = []
-        for (test_case_name, resolved), rows in zip(resolved_by_case, rows_by_case):
-            result = _run_one_row(agent, resolved, rows[row_index], connection_id, buffer, test_case_name)
-            result.row_index = row_index
-            row_results.append(result)
-            if not result.success:
-                break
-        all_results.append(row_results)
-
-    return all_results
+    assumed to belong to the same logical chain run; sheets must have equal row counts."""
+    return run_chain_with_rows(agent, session_factory, [(name, _read_rows(sheet)) for name, sheet in chain], connection_id)

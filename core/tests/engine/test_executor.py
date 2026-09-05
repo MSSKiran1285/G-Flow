@@ -6,41 +6,7 @@ from smt.adapter.generated import uiadapter_pb2 as pb
 from smt.engine.executor import define_test_case, run_chain, run_test_case
 from smt.repository.db import init_db, make_engine, make_session_factory
 from smt.repository.models import Module, ModuleAttribute
-
-
-class FakeAgent:
-    """Minimal in-process double for UiAgentPort: records every SET it receives, fails a
-    chosen (component_id, op) combination on demand, and serves scripted statusbar text
-    (one entry per STATUSBAR_READ call, repeating the last once exhausted) — all without
-    needing gRPC, COM, or a fixture file."""
-
-    def __init__(self, fail_on: tuple[str, int] | None = None, statusbar_texts: list[str] | None = None):
-        self.fail_on = fail_on
-        self.statusbar_texts = list(statusbar_texts) if statusbar_texts else ["Standard Order 999 has been saved"]
-        self.sets: list[tuple[str, str]] = []
-        self.sessions_opened = 0
-        self.sessions_closed = 0
-
-    def open_session(self, request):
-        self.sessions_opened += 1
-        return pb.SessionHandle(session_id=f"ses{self.sessions_opened}")
-
-    def close_session(self, handle):
-        self.sessions_closed += 1
-        return pb.Ack(success=True)
-
-    def execute_action(self, request):
-        if self.fail_on == (request.component_id, request.op):
-            return pb.ActionResult(success=False, error_message="boom")
-        if request.op == pb.SET:
-            self.sets.append((request.component_id, request.params.text_value))
-            return pb.ActionResult(success=True, actual_value=request.params.text_value)
-        if request.op == pb.STATUSBAR_READ:
-            text = self.statusbar_texts.pop(0) if len(self.statusbar_texts) > 1 else self.statusbar_texts[0]
-            result = pb.ActionResult(success=True)
-            result.statusbar_deltas.add(type="S", text=text)
-            return result
-        return pb.ActionResult(success=True)
+from tests.support.fake_agent import FakeAgent
 
 
 @pytest.fixture

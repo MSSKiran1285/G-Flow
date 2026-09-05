@@ -206,6 +206,23 @@ def run_chain_cmd(
             typer.echo(f"  buffer: {row[-1].buffer}")
 
 
+@app.command("run-api")
+def run_api_cmd(
+    host: str = typer.Option("127.0.0.1", help="Bind host for the FastAPI backend"),
+    port: int = typer.Option(8000, help="Bind port for the FastAPI backend"),
+    target: str = typer.Option("localhost:50051", help="SapGuiAgent gRPC target"),
+) -> None:
+    """Start the FastAPI backend for the script-builder web UI (core/ui, run separately
+    via `npm run dev`). For backend-dev autoreload use
+    `uvicorn smt.api.app:create_app --factory --reload --port 8000` directly instead —
+    Typer -> uvicorn.run can't honor --reload against an already-built app object."""
+    import uvicorn
+
+    from smt.api.app import create_app
+
+    uvicorn.run(create_app(target=target), host=host, port=port)
+
+
 @app.command("run-steps")
 def run_steps(
     yaml_path: Path = typer.Argument(..., help="YAML file with `session` + `steps`"),

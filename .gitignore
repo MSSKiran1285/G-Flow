@@ -14,6 +14,11 @@ core/.pytest_cache/
 core/.mypy_cache/
 core/.ruff_cache/
 
+# Node / frontend
+core/ui/node_modules/
+core/ui/dist/
+core/ui/*.tsbuildinfo
+
 # Editor / OS
 .vs/
 .vscode/
