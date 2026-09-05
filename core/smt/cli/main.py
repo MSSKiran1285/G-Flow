@@ -213,9 +213,11 @@ def run_api_cmd(
     target: str = typer.Option("localhost:50051", help="SapGuiAgent gRPC target"),
 ) -> None:
     """Start the FastAPI backend for the script-builder web UI (core/ui, run separately
-    via `npm run dev`). For backend-dev autoreload use
-    `uvicorn smt.api.app:create_app --factory --reload --port 8000` directly instead —
-    Typer -> uvicorn.run can't honor --reload against an already-built app object."""
+    via `npm run dev`). Run from the repo root, like every other `smt` command (see
+    README) — DEFAULT_DB_PATH is relative to that cwd. For backend-dev autoreload use
+    `uvicorn smt.api.app:create_app --factory --reload --port 8000 --app-dir core`
+    directly instead — Typer -> uvicorn.run can't honor --reload against an
+    already-built app object."""
     import uvicorn
 
     from smt.api.app import create_app

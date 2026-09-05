@@ -361,10 +361,21 @@ conversation) — needs a decision before this epic can start.
 
 **Goal:** A non-programmer tester can assemble and data-drive a test visually.
 
-**Status: ⬜ Not started.** `core/api/` (FastAPI) and `core/ui/` (React) are still
-empty placeholders. Explicitly deferred in favor of the CLI/config-driven path (Epics
-3–5) per direct discussion — revisit once there's enough real usage to know what a UI
-actually needs to support.
+**Status: 🟡 Partial — lean MVP built and live-verified.** `core/smt/api/` (FastAPI)
+exposes the repository/engine over HTTP (`/api/modules`, `/api/test-cases`,
+`/api/runs/test-case`, `/api/runs/chain`, `/api/connections`), and `core/ui/`
+(React + Vite, no component library, design tokens inspired by the G-Stride
+reference project) lets a tester browse/scan Modules, build a TestCase's steps
+visually (add/edit/reorder/duplicate/remove — drag-and-drop plus a parallel
+keyboard-operable reorder path), run it against an inline data grid, and chain
+several TestCases together (mirrors `run_chain`) with live pass/fail results and
+captured buffers rendered per step/stage. Verified live end-to-end through the real
+HTTP API against the live SAP session (scanned a module, defined a TestCase, ran it,
+confirmed the target field was actually set on the live screen) — not yet used to
+author a full business-process chain end to end (that's the P2P scenario, next).
+Deliberately not built: an Object Repository workspace, a persisted Test Data
+library, execution history/audit, or global search — those are real gaps versus a
+full IDE-like tool, scoped out for this MVP.
 
 ---
 

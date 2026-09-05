@@ -24,6 +24,15 @@ everything confirmed (or found broken) against a real system.
   document numbers and `run_chain` for threading a buffer across several TestCases;
   F4-based and table-based (SE16N) master-data mining; a Typer CLI (`smt ...`) tying it
   together.
+- **A script-builder web UI now exists**: `core/smt/api/` (FastAPI) exposes the
+  repository/engine over HTTP, and `core/ui/` (React + Vite, no component library,
+  design tokens inspired by the read-only G-Stride reference project) lets a tester
+  browse/scan Modules, build a TestCase's steps visually (add/edit/reorder/duplicate/
+  remove — drag-and-drop plus a parallel keyboard reorder path), run it against an
+  inline data grid, and chain several TestCases together (mirrors `run_chain`) with
+  live pass/fail results and captured buffers shown per step/stage. Verified live
+  end-to-end through the real HTTP API against the live SAP session. See "Script
+  builder UI" below.
 - **Proven fully end-to-end against a live system, order through FI posting**: scanned
   two real screens as Modules, assembled a data-driven TestCase from them (no hardcoded
   component ids), ran it against several different, historically-mined data rows, and
@@ -103,9 +112,31 @@ feeding a delivery created by the next):
 smt run-chain --step "OrderCase:orders.csv" --step "DeliveryCase:deliveries.csv"
 ```
 
-This is CLI/config-driven, not a graphical front end — no React/FastAPI UI exists yet
-(`core/api/`, `core/ui/` are still empty). See `docs/assumptions.md` for that scoping
-discussion.
+The CLI/config-driven path above still works unchanged; the same repository/engine is
+now also reachable through a web UI (see `docs/assumptions.md` for the original
+CLI-first scoping discussion, and below for the UI itself).
+
+## Script builder UI
+
+Three processes, in order (all commands below run from the **repo root**, same as
+every `smt` command above):
+
+```
+cd agent && dotnet run --project SapGuiAgent        # :50051, needs SAP GUI open+connected
+
+core/.venv/Scripts/python -m smt.cli.main run-api    # :8000
+
+cd core/ui && npm install && npm run dev             # :5173, proxies /api to :8000
+```
+
+Open `http://localhost:5173`. **Modules**: browse scanned screens, or scan a new one
+live (tcode, optional prefill fields/vkeys to reach a second screen). **Scripts**:
+build a TestCase's steps visually — pick a Module+attribute (or a raw component id
+for conditional elements like popups), an action, a binding (literal / from test data
+/ captured by an earlier step), reorder via drag-and-drop or the keyboard (arrow keys
+on each row's ⠿ handle) — then run it against an inline data grid and see real
+pass/fail + statusbar output. **Chains**: sequence several scripts, one data grid per
+stage, sharing captured buffers across stages (mirrors `run-chain`).
 
 ## Known gaps
 
@@ -113,7 +144,9 @@ discussion.
   checkbox/button cells) — reads, double-click, row-select, and current-cell all exist
   now. Trees, text-edit shells, other shells — all still unimplemented.
 - Self-healing (`ResolveLocator`) — not started.
-- No web UI, no FastAPI backend, no AI services, no business-process modeling.
+- The script-builder UI is a lean MVP: no Object Repository workspace, no persisted
+  Test Data library (data grids are entered inline per run, not saved), no execution
+  history/audit vault, no global search. No AI services, no business-process modeling.
 - Recovery scenarios (retry/relogon), reporting (HTML/JUnit) — engine MVP doesn't have
   these yet. Buffers + chaining across TestCases exist (`run_chain`); the full O2C
   chain (order → delivery → goods issue → billing → FI posting) is now proven live

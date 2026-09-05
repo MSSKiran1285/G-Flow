@@ -11,7 +11,7 @@ from sqlalchemy.pool import StaticPool
 
 from smt.repository.models import Base
 
-DEFAULT_DB_PATH = Path("data/repository.db")  # relative to cwd=core/, the documented convention every `smt` command assumes
+DEFAULT_DB_PATH = Path("core/data/repository.db")  # relative to the repo root — the documented convention every `smt` command assumes (see README)
 
 
 def make_engine(db_path: Path | str = DEFAULT_DB_PATH):
