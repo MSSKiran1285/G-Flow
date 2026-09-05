@@ -6,8 +6,11 @@ import type {
   ModuleSummary,
   RunChainResponse,
   RunTestCaseResponse,
+  SaveModuleRequest,
   ScanModuleRequest,
   ScanModuleResponse,
+  ScanPreviewRequest,
+  ScanPreviewResponse,
   TestCaseDetail,
   TestCaseSpec,
   TestCaseSummary,
@@ -42,6 +45,10 @@ export const api = {
   getModule: (name: string) => request<ModuleDetail>(`/api/modules/${encodeURIComponent(name)}`),
   scanModule: (body: ScanModuleRequest) =>
     request<ScanModuleResponse>("/api/modules/scan", { method: "POST", body: JSON.stringify(body) }),
+  scanPreview: (body: ScanPreviewRequest) =>
+    request<ScanPreviewResponse>("/api/modules/scan-preview", { method: "POST", body: JSON.stringify(body) }),
+  saveModule: (body: SaveModuleRequest) =>
+    request<ScanModuleResponse>("/api/modules", { method: "POST", body: JSON.stringify(body) }),
 
   listTestCases: () => request<TestCaseSummary[]>("/api/test-cases"),
   getTestCase: (name: string) => request<TestCaseDetail>(`/api/test-cases/${encodeURIComponent(name)}`),

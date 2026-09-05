@@ -25,6 +25,59 @@ def test_get_unknown_module_returns_404(client):
     assert r.status_code == 404
 
 
+def test_scan_preview_returns_candidates_without_persisting_anything(client):
+    c, agent = client
+
+    snapshot = pb.ScreenSnapshot()
+    snapshot.root.id = "/app/con[0]/ses[0]/wnd[0]"
+    snapshot.root.type = "GuiMainWindow"
+    field = snapshot.root.children.add()
+    field.id = "/app/con[0]/ses[0]/wnd[0]/usr/ctxtVBAK-VTWEG"
+    field.type = "GuiCTextField"
+    field.name = "VBAK-VTWEG"
+    button = snapshot.root.children.add()
+    button.id = "/app/con[0]/ses[0]/wnd[0]/tbar[0]/btn[11]"
+    button.type = "GuiButton"
+    button.name = "btn[11]"
+    agent.scan_result = snapshot
+
+    r = c.post("/api/modules/scan-preview", json={"tcode": "VA01", "connection_id": "conn1"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["tcode"] == "VA01"
+    component_ids = {comp["component_id"] for comp in body["components"]}
+    assert "wnd[0]/usr/ctxtVBAK-VTWEG" in component_ids
+    assert "wnd[0]/tbar[0]/btn[11]" in component_ids
+    assert all(comp["window"] == "wnd[0]" for comp in body["components"])
+
+    # nothing persisted by the preview alone — only the fixture-seeded module exists
+    assert [m["name"] for m in c.get("/api/modules").json()] == ["VA01_InitialScreen"]
+
+
+def test_save_module_persists_only_the_curated_selection(client):
+    c, _agent = client
+
+    r = c.post("/api/modules", json={
+        "module_name": "VA01_Curated",
+        "tcode": "VA01",
+        "root_id": "wnd[0]",
+        "attributes": [
+            {
+                "semantic_name": "distribution_channel",
+                "component_id": "wnd[0]/usr/ctxtVBAK-VTWEG",
+                "sap_type": "GuiCTextField",
+                "supported_action_modes": ["SET", "READ"],
+            },
+        ],
+    })
+    assert r.status_code == 200
+    assert r.json()["attribute_count"] == 1
+
+    detail = c.get("/api/modules/VA01_Curated").json()
+    assert [a["semantic_name"] for a in detail["attributes"]] == ["distribution_channel"]
+    assert detail["attributes"][0]["supported_action_modes"] == ["SET", "READ"]
+
+
 def test_scan_module_persists_a_new_module(client):
     c, agent = client
 

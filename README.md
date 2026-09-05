@@ -130,7 +130,11 @@ cd core/ui && npm install && npm run dev             # :5173, proxies /api to :8
 ```
 
 Open `http://localhost:5173`. **Modules**: browse scanned screens, or scan a new one
-live (tcode, optional prefill fields/vkeys to reach a second screen). **Scripts**:
+live (tcode, optional prefill fields/vkeys to reach a second screen) — the scan is a
+two-step *preview then pick*: every field/button/label found is shown grouped by
+window (`wnd[0]`, `wnd[1]`, ...) with a checkbox and an editable name per row, and
+only the ones actually checked get saved as the Module's attributes, not the whole
+screen. **Scripts**:
 build a TestCase's steps visually — pick a Module+attribute (or a raw component id
 for conditional elements like popups), an action, a binding (literal / from test data
 / captured by an earlier step), reorder via drag-and-drop or the keyboard (arrow keys

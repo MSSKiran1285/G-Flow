@@ -70,6 +70,49 @@ class ScanModuleResponse(BaseModel):
     attribute_count: int
 
 
+class ScanPreviewRequest(BaseModel):
+    tcode: str
+    root_id: str = "wnd[0]"
+    navigate: bool = True
+    prefill: dict[str, str] = {}
+    vkeys_before_scan: list[str] = []
+    connection_id: str | None = None
+
+
+class ScannedComponentOut(BaseModel):
+    component_id: str
+    window: str
+    semantic_name: str
+    sap_type: str
+    sap_sub_type: str
+    label: str
+    supported_action_modes: list[str]
+
+
+class ScanPreviewResponse(BaseModel):
+    tcode: str
+    screen_number: str
+    root_id: str
+    components: list[ScannedComponentOut]
+
+
+class SelectedAttribute(BaseModel):
+    semantic_name: str
+    component_id: str
+    sap_type: str = ""
+    sap_sub_type: str = ""
+    label: str = ""
+    supported_action_modes: list[str] = []
+
+
+class SaveModuleRequest(BaseModel):
+    module_name: str
+    tcode: str
+    root_id: str = "wnd[0]"
+    screen_number: str = ""
+    attributes: list[SelectedAttribute]
+
+
 # --- test cases ---
 
 def _is_known_action(name: str) -> bool:

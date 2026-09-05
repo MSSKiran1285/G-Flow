@@ -12,11 +12,15 @@ from smt.api.schemas import (
     ModuleAttributeOut,
     ModuleDetail,
     ModuleSummary,
+    ScannedComponentOut,
     ScanModuleRequest,
     ScanModuleResponse,
+    ScanPreviewRequest,
+    ScanPreviewResponse,
+    SaveModuleRequest,
 )
 from smt.repository.models import Module
-from smt.repository.scanning import scan_module
+from smt.repository.scanning import save_module, scan_module, scan_screen_preview
 
 router = APIRouter(tags=["modules"])
 
@@ -60,6 +64,10 @@ def scan_module_endpoint(
     agent: UiAgentPort = Depends(get_agent),
     session_factory: sessionmaker[Session] = Depends(get_session_factory),
 ) -> ScanModuleResponse:
+    """All-in-one scan + persist-everything. Kept for parity with the CLI's
+    `scan-module` command / quick full scans; the script-builder UI uses
+    /modules/scan-preview + POST /modules instead so a tester can pick and choose
+    which fields/buttons actually become Module attributes."""
     connection_id = resolve_connection_id(agent, body.connection_id)
     handle = agent.open_session(pb.OpenSessionRequest(connection_id=connection_id))
     try:
@@ -72,3 +80,48 @@ def scan_module_endpoint(
         agent.close_session(handle)
 
     return ScanModuleResponse(module_id=module_id, module_name=body.module_name, attribute_count=attribute_count)
+
+
+@router.post("/modules/scan-preview", response_model=ScanPreviewResponse)
+def scan_preview_endpoint(
+    body: ScanPreviewRequest,
+    agent: UiAgentPort = Depends(get_agent),
+) -> ScanPreviewResponse:
+    """Live navigate+scan without persisting anything — returns every candidate
+    field/button/label found so the UI can let a tester pick and choose which ones to
+    keep, and rename them, before POST /modules actually saves a Module."""
+    connection_id = resolve_connection_id(agent, body.connection_id)
+    handle = agent.open_session(pb.OpenSessionRequest(connection_id=connection_id))
+    try:
+        screen_number, components = scan_screen_preview(
+            agent, handle, tcode=body.tcode, root_id=body.root_id,
+            navigate=body.navigate, prefill=body.prefill, vkeys_before_scan=body.vkeys_before_scan,
+        )
+    finally:
+        agent.close_session(handle)
+
+    return ScanPreviewResponse(
+        tcode=body.tcode, screen_number=screen_number, root_id=body.root_id,
+        components=[
+            ScannedComponentOut(
+                component_id=c.component_id, window=c.window, semantic_name=c.semantic_name,
+                sap_type=c.sap_type, sap_sub_type=c.sap_sub_type, label=c.label,
+                supported_action_modes=c.supported_action_modes,
+            )
+            for c in components
+        ],
+    )
+
+
+@router.post("/modules", response_model=ScanModuleResponse)
+def save_module_endpoint(
+    body: SaveModuleRequest,
+    session_factory: sessionmaker[Session] = Depends(get_session_factory),
+) -> ScanModuleResponse:
+    """Persists a Module from an already-curated attribute list (the selection a
+    tester made from a prior /modules/scan-preview) — no live agent call needed here."""
+    module_id, count = save_module(
+        session_factory, module_name=body.module_name, tcode=body.tcode, root_id=body.root_id,
+        screen_number=body.screen_number, attributes=[a.model_dump() for a in body.attributes],
+    )
+    return ScanModuleResponse(module_id=module_id, module_name=body.module_name, attribute_count=count)

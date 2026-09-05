@@ -53,6 +53,49 @@ export interface ScanModuleResponse {
   attribute_count: number;
 }
 
+export interface ScanPreviewRequest {
+  tcode: string;
+  root_id?: string;
+  navigate?: boolean;
+  prefill?: Record<string, string>;
+  vkeys_before_scan?: string[];
+  connection_id?: string | null;
+}
+
+export interface ScannedComponentOut {
+  component_id: string;
+  window: string;
+  semantic_name: string;
+  sap_type: string;
+  sap_sub_type: string;
+  label: string;
+  supported_action_modes: string[];
+}
+
+export interface ScanPreviewResponse {
+  tcode: string;
+  screen_number: string;
+  root_id: string;
+  components: ScannedComponentOut[];
+}
+
+export interface SelectedAttribute {
+  semantic_name: string;
+  component_id: string;
+  sap_type?: string;
+  sap_sub_type?: string;
+  label?: string;
+  supported_action_modes?: string[];
+}
+
+export interface SaveModuleRequest {
+  module_name: string;
+  tcode: string;
+  root_id?: string;
+  screen_number?: string;
+  attributes: SelectedAttribute[];
+}
+
 export type BindingType = "literal" | "column" | "buffer";
 
 export interface BindingSpec {
