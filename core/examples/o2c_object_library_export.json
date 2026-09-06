@@ -1,0 +1,957 @@
+{
+  "modules": [
+    {
+      "module_name": "VA01",
+      "tcode": "VA01",
+      "root_id": "wnd[0]",
+      "screen_number": "",
+      "folder": "Sales",
+      "attributes": [
+        {
+          "semantic_name": "save_button",
+          "component_id": "wnd[0]/tbar[0]/btn[11]",
+          "sap_type": "GuiButton",
+          "sap_sub_type": "",
+          "label": "",
+          "caption": "Save",
+          "window_title": "Create Standard Order: Overview",
+          "supported_action_modes": [
+            "PRESS"
+          ],
+          "direction": "output"
+        },
+        {
+          "semantic_name": "okcd",
+          "component_id": "wnd[0]/tbar[0]/okcd",
+          "sap_type": "GuiOkCodeField",
+          "sap_sub_type": "",
+          "label": "",
+          "caption": "OK-code (command field)",
+          "window_title": "",
+          "supported_action_modes": [
+            "SET"
+          ],
+          "direction": "input"
+        },
+        {
+          "semantic_name": "order_type",
+          "component_id": "wnd[0]/usr/ctxtVBAK-AUART",
+          "sap_type": "GuiCTextField",
+          "sap_sub_type": "",
+          "label": "",
+          "caption": "Order Type",
+          "window_title": "Create Standard Order: Initial Screen",
+          "supported_action_modes": [
+            "SET"
+          ],
+          "direction": "input"
+        },
+        {
+          "semantic_name": "division",
+          "component_id": "wnd[0]/usr/ctxtVBAK-SPART",
+          "sap_type": "GuiCTextField",
+          "sap_sub_type": "",
+          "label": "",
+          "caption": "Division",
+          "window_title": "Create Standard Order: Initial Screen",
+          "supported_action_modes": [
+            "SET"
+          ],
+          "direction": "input"
+        },
+        {
+          "semantic_name": "sales_org",
+          "component_id": "wnd[0]/usr/ctxtVBAK-VKORG",
+          "sap_type": "GuiCTextField",
+          "sap_sub_type": "",
+          "label": "",
+          "caption": "Sales Organization",
+          "window_title": "Create Standard Order: Initial Screen",
+          "supported_action_modes": [
+            "SET"
+          ],
+          "direction": "input"
+        },
+        {
+          "semantic_name": "distribution_channel",
+          "component_id": "wnd[0]/usr/ctxtVBAK-VTWEG",
+          "sap_type": "GuiCTextField",
+          "sap_sub_type": "",
+          "label": "",
+          "caption": "Distribution Channel",
+          "window_title": "Create Standard Order: Initial Screen",
+          "supported_action_modes": [
+            "SET"
+          ],
+          "direction": "input"
+        },
+        {
+          "semantic_name": "customer",
+          "component_id": "wnd[0]/usr/subSUBSCREEN_HEADER:SAPMV45A:4021/subPART-SUB:SAPMV45A:4701/ctxtKUAGV-KUNNR",
+          "sap_type": "GuiCTextField",
+          "sap_sub_type": "",
+          "label": "",
+          "caption": "Sold-To Party",
+          "window_title": "Create Standard Order: Overview",
+          "supported_action_modes": [
+            "SET"
+          ],
+          "direction": "input"
+        },
+        {
+          "semantic_name": "po_number",
+          "component_id": "wnd[0]/usr/subSUBSCREEN_HEADER:SAPMV45A:4021/txtVBKD-BSTKD",
+          "sap_type": "GuiTextField",
+          "sap_sub_type": "",
+          "label": "",
+          "caption": "PO Number",
+          "window_title": "Create Standard Order: Overview",
+          "supported_action_modes": [
+            "SET"
+          ],
+          "direction": "input"
+        },
+        {
+          "semantic_name": "material_cell",
+          "component_id": "wnd[0]/usr/tabsTAXI_TABSTRIP_OVERVIEW/tabpT\\01/ssubSUBSCREEN_BODY:SAPMV45A:4400/subSUBSCREEN_TC:SAPMV45A:4900/tblSAPMV45ATCTRL_U_ERF_AUFTRAG/ctxtRV45A-MABNR[1,0]",
+          "sap_type": "GuiCTextField",
+          "sap_sub_type": "",
+          "label": "",
+          "caption": "Material (item table, row 0)",
+          "window_title": "Create Standard Order: Overview",
+          "supported_action_modes": [
+            "SET",
+            "TABLE_SET_CELL",
+            "TABLE_GET_CELL"
+          ],
+          "direction": "input"
+        },
+        {
+          "semantic_name": "plant_cell",
+          "component_id": "wnd[0]/usr/tabsTAXI_TABSTRIP_OVERVIEW/tabpT\\01/ssubSUBSCREEN_BODY:SAPMV45A:4400/subSUBSCREEN_TC:SAPMV45A:4900/tblSAPMV45ATCTRL_U_ERF_AUFTRAG/ctxtVBAP-WERKS[12,0]",
+          "sap_type": "GuiCTextField",
+          "sap_sub_type": "",
+          "label": "",
+          "caption": "Plant (item table, row 0)",
+          "window_title": "Create Standard Order: Overview",
+          "supported_action_modes": [
+            "SET",
+            "TABLE_SET_CELL",
+            "TABLE_GET_CELL"
+          ],
+          "direction": "input"
+        },
+        {
+          "semantic_name": "quantity_cell",
+          "component_id": "wnd[0]/usr/tabsTAXI_TABSTRIP_OVERVIEW/tabpT\\01/ssubSUBSCREEN_BODY:SAPMV45A:4400/subSUBSCREEN_TC:SAPMV45A:4900/tblSAPMV45ATCTRL_U_ERF_AUFTRAG/txtRV45A-KWMENG[2,0]",
+          "sap_type": "GuiTextField",
+          "sap_sub_type": "",
+          "label": "",
+          "caption": "Order Quantity (item table, row 0)",
+          "window_title": "Create Standard Order: Overview",
+          "supported_action_modes": [
+            "SET",
+            "TABLE_SET_CELL",
+            "TABLE_GET_CELL"
+          ],
+          "direction": "input"
+        }
+      ]
+    },
+    {
+      "module_name": "VF01",
+      "tcode": "VF01",
+      "root_id": "wnd[0]",
+      "screen_number": "",
+      "folder": "Sales",
+      "attributes": [
+        {
+          "semantic_name": "save_button",
+          "component_id": "wnd[0]/tbar[0]/btn[11]",
+          "sap_type": "GuiButton",
+          "sap_sub_type": "",
+          "label": "",
+          "caption": "Save",
+          "window_title": "Create Billing Document",
+          "supported_action_modes": [
+            "PRESS"
+          ],
+          "direction": "output"
+        },
+        {
+          "semantic_name": "okcd",
+          "component_id": "wnd[0]/tbar[0]/okcd",
+          "sap_type": "GuiOkCodeField",
+          "sap_sub_type": "",
+          "label": "",
+          "caption": "OK-code (command field)",
+          "window_title": "",
+          "supported_action_modes": [
+            "SET"
+          ],
+          "direction": "input"
+        },
+        {
+          "semantic_name": "delivery_number_cell",
+          "component_id": "wnd[0]/usr/tblSAPMV60ATCTRL_ERF_FAKT/ctxtKOMFK-VBELN[0,0]",
+          "sap_type": "GuiCTextField",
+          "sap_sub_type": "",
+          "label": "",
+          "caption": "Document (delivery number, row 0)",
+          "window_title": "Create Billing Document",
+          "supported_action_modes": [
+            "SET"
+          ],
+          "direction": "input"
+        }
+      ]
+    },
+    {
+      "module_name": "VL01N",
+      "tcode": "VL01N",
+      "root_id": "wnd[0]",
+      "screen_number": "",
+      "folder": "Sales",
+      "attributes": [
+        {
+          "semantic_name": "save_button",
+          "component_id": "wnd[0]/tbar[0]/btn[11]",
+          "sap_type": "GuiButton",
+          "sap_sub_type": "",
+          "label": "",
+          "caption": "Save",
+          "window_title": "Outbound Delivery Create: Overview",
+          "supported_action_modes": [
+            "PRESS"
+          ],
+          "direction": "output"
+        },
+        {
+          "semantic_name": "okcd",
+          "component_id": "wnd[0]/tbar[0]/okcd",
+          "sap_type": "GuiOkCodeField",
+          "sap_sub_type": "",
+          "label": "",
+          "caption": "OK-code (command field)",
+          "window_title": "",
+          "supported_action_modes": [
+            "SET"
+          ],
+          "direction": "input"
+        },
+        {
+          "semantic_name": "shipping_point",
+          "component_id": "wnd[0]/usr/ctxtLIKP-VSTEL",
+          "sap_type": "GuiCTextField",
+          "sap_sub_type": "",
+          "label": "",
+          "caption": "Shipping Point",
+          "window_title": "Create Outbound Delivery with Order Reference",
+          "supported_action_modes": [
+            "SET"
+          ],
+          "direction": "input"
+        },
+        {
+          "semantic_name": "selection_date",
+          "component_id": "wnd[0]/usr/ctxtLV50C-DATBI",
+          "sap_type": "GuiCTextField",
+          "sap_sub_type": "",
+          "label": "",
+          "caption": "Selection Date",
+          "window_title": "Create Outbound Delivery with Order Reference",
+          "supported_action_modes": [
+            "SET"
+          ],
+          "direction": "input"
+        },
+        {
+          "semantic_name": "order_number",
+          "component_id": "wnd[0]/usr/ctxtLV50C-VBELN",
+          "sap_type": "GuiCTextField",
+          "sap_sub_type": "",
+          "label": "",
+          "caption": "Order",
+          "window_title": "Create Outbound Delivery with Order Reference",
+          "supported_action_modes": [
+            "SET"
+          ],
+          "direction": "input"
+        }
+      ]
+    },
+    {
+      "module_name": "VL02N",
+      "tcode": "VL02N",
+      "root_id": "wnd[0]",
+      "screen_number": "",
+      "folder": "Sales",
+      "attributes": [
+        {
+          "semantic_name": "okcd",
+          "component_id": "wnd[0]/tbar[0]/okcd",
+          "sap_type": "GuiOkCodeField",
+          "sap_sub_type": "",
+          "label": "",
+          "caption": "OK-code (command field)",
+          "window_title": "",
+          "supported_action_modes": [
+            "SET"
+          ],
+          "direction": "input"
+        },
+        {
+          "semantic_name": "post_goods_issue_button",
+          "component_id": "wnd[0]/tbar[1]/btn[20]",
+          "sap_type": "GuiButton",
+          "sap_sub_type": "",
+          "label": "",
+          "caption": "Post Goods Issue",
+          "window_title": "Outbound Delivery Change: Overview",
+          "supported_action_modes": [
+            "PRESS"
+          ],
+          "direction": "output"
+        },
+        {
+          "semantic_name": "delivery_number",
+          "component_id": "wnd[0]/usr/ctxtLIKP-VBELN",
+          "sap_type": "GuiCTextField",
+          "sap_sub_type": "",
+          "label": "",
+          "caption": "Outbound Delivery",
+          "window_title": "Change Outbound Delivery",
+          "supported_action_modes": [
+            "SET"
+          ],
+          "direction": "input"
+        },
+        {
+          "semantic_name": "actual_gi_date",
+          "component_id": "wnd[0]/usr/tabsTAXI_TABSTRIP_OVERVIEW/tabpT\\01/ssubSUBSCREEN_BODY:SAPMV50A:1102/ctxtLIKP-WADAT_IST",
+          "sap_type": "GuiCTextField",
+          "sap_sub_type": "",
+          "label": "",
+          "caption": "Actual GI Date",
+          "window_title": "Outbound Delivery Change: Overview",
+          "supported_action_modes": [
+            "SET"
+          ],
+          "direction": "input"
+        },
+        {
+          "semantic_name": "storage_location_cell",
+          "component_id": "wnd[0]/usr/tabsTAXI_TABSTRIP_OVERVIEW/tabpT\\01/ssubSUBSCREEN_BODY:SAPMV50A:1102/tblSAPMV50ATC_LIPS_OVER/ctxtLIPS-LGORT[30,0]",
+          "sap_type": "GuiCTextField",
+          "sap_sub_type": "",
+          "label": "",
+          "caption": "Storage Location (item table, row 0)",
+          "window_title": "Outbound Delivery Change: Overview",
+          "supported_action_modes": [
+            "SET",
+            "TABLE_SET_CELL",
+            "TABLE_GET_CELL"
+          ],
+          "direction": "input"
+        },
+        {
+          "semantic_name": "picked_qty_cell",
+          "component_id": "wnd[0]/usr/tabsTAXI_TABSTRIP_OVERVIEW/tabpT\\01/ssubSUBSCREEN_BODY:SAPMV50A:1102/tblSAPMV50ATC_LIPS_OVER/txtLIPSD-PIKMG[15,0]",
+          "sap_type": "GuiTextField",
+          "sap_sub_type": "",
+          "label": "",
+          "caption": "Picked Quantity (item table, row 0)",
+          "window_title": "Outbound Delivery Change: Overview",
+          "supported_action_modes": [
+            "SET",
+            "TABLE_SET_CELL",
+            "TABLE_GET_CELL"
+          ],
+          "direction": "input"
+        }
+      ]
+    }
+  ],
+  "test_cases": [
+    {
+      "name": "VA01_CreateStandardOrder",
+      "description": "O2C step 1: create a standard sales order.",
+      "steps": [
+        {
+          "module": "VA01",
+          "attribute": "okcd",
+          "component_id": null,
+          "action": "SET",
+          "binding": {
+            "type": "literal",
+            "value": "/nVA01"
+          },
+          "row_binding": {
+            "type": "literal",
+            "value": ""
+          },
+          "optional": false,
+          "capture": null
+        },
+        {
+          "module": null,
+          "attribute": null,
+          "component_id": "wnd[0]",
+          "action": "SEND_VKEY",
+          "binding": {
+            "type": "literal",
+            "value": "Enter"
+          },
+          "row_binding": {
+            "type": "literal",
+            "value": ""
+          },
+          "optional": false,
+          "capture": null
+        },
+        {
+          "module": "VA01",
+          "attribute": "order_type",
+          "component_id": null,
+          "action": "SET",
+          "binding": {
+            "type": "column",
+            "value": "order_type"
+          },
+          "row_binding": {
+            "type": "literal",
+            "value": ""
+          },
+          "optional": false,
+          "capture": null
+        },
+        {
+          "module": "VA01",
+          "attribute": "sales_org",
+          "component_id": null,
+          "action": "SET",
+          "binding": {
+            "type": "column",
+            "value": "sales_org"
+          },
+          "row_binding": {
+            "type": "literal",
+            "value": ""
+          },
+          "optional": false,
+          "capture": null
+        },
+        {
+          "module": "VA01",
+          "attribute": "distribution_channel",
+          "component_id": null,
+          "action": "SET",
+          "binding": {
+            "type": "column",
+            "value": "distribution_channel"
+          },
+          "row_binding": {
+            "type": "literal",
+            "value": ""
+          },
+          "optional": false,
+          "capture": null
+        },
+        {
+          "module": "VA01",
+          "attribute": "division",
+          "component_id": null,
+          "action": "SET",
+          "binding": {
+            "type": "column",
+            "value": "division"
+          },
+          "row_binding": {
+            "type": "literal",
+            "value": ""
+          },
+          "optional": false,
+          "capture": null
+        },
+        {
+          "module": null,
+          "attribute": null,
+          "component_id": "wnd[0]",
+          "action": "SEND_VKEY",
+          "binding": {
+            "type": "literal",
+            "value": "Enter"
+          },
+          "row_binding": {
+            "type": "literal",
+            "value": ""
+          },
+          "optional": false,
+          "capture": null
+        },
+        {
+          "module": "VA01",
+          "attribute": "customer",
+          "component_id": null,
+          "action": "SET",
+          "binding": {
+            "type": "column",
+            "value": "customer"
+          },
+          "row_binding": {
+            "type": "literal",
+            "value": ""
+          },
+          "optional": false,
+          "capture": null
+        },
+        {
+          "module": "VA01",
+          "attribute": "po_number",
+          "component_id": null,
+          "action": "SET",
+          "binding": {
+            "type": "column",
+            "value": "po_number"
+          },
+          "row_binding": {
+            "type": "literal",
+            "value": ""
+          },
+          "optional": false,
+          "capture": null
+        },
+        {
+          "module": "VA01",
+          "attribute": "material_cell",
+          "component_id": null,
+          "action": "TABLE_SET_CELL",
+          "binding": {
+            "type": "column",
+            "value": "material"
+          },
+          "row_binding": {
+            "type": "literal",
+            "value": "0"
+          },
+          "optional": false,
+          "capture": null
+        },
+        {
+          "module": "VA01",
+          "attribute": "quantity_cell",
+          "component_id": null,
+          "action": "TABLE_SET_CELL",
+          "binding": {
+            "type": "column",
+            "value": "quantity"
+          },
+          "row_binding": {
+            "type": "literal",
+            "value": "0"
+          },
+          "optional": false,
+          "capture": null
+        },
+        {
+          "module": "VA01",
+          "attribute": "plant_cell",
+          "component_id": null,
+          "action": "TABLE_SET_CELL",
+          "binding": {
+            "type": "column",
+            "value": "plant"
+          },
+          "row_binding": {
+            "type": "literal",
+            "value": "0"
+          },
+          "optional": false,
+          "capture": null
+        },
+        {
+          "module": null,
+          "attribute": null,
+          "component_id": "wnd[0]",
+          "action": "SEND_VKEY",
+          "binding": {
+            "type": "literal",
+            "value": "Enter"
+          },
+          "row_binding": {
+            "type": "literal",
+            "value": ""
+          },
+          "optional": false,
+          "capture": null
+        },
+        {
+          "module": "VA01",
+          "attribute": "save_button",
+          "component_id": null,
+          "action": "PRESS",
+          "binding": {
+            "type": "literal",
+            "value": ""
+          },
+          "row_binding": {
+            "type": "literal",
+            "value": ""
+          },
+          "optional": false,
+          "capture": {
+            "buffer": "order_number",
+            "from": "statusbar",
+            "pattern": "order_saved"
+          }
+        }
+      ]
+    },
+    {
+      "name": "VF01_CreateBilling",
+      "description": "O2C step 4: create the billing document for the delivery.",
+      "steps": [
+        {
+          "module": "VF01",
+          "attribute": "okcd",
+          "component_id": null,
+          "action": "SET",
+          "binding": {
+            "type": "literal",
+            "value": "/nVF01"
+          },
+          "row_binding": {
+            "type": "literal",
+            "value": ""
+          },
+          "optional": false,
+          "capture": null
+        },
+        {
+          "module": null,
+          "attribute": null,
+          "component_id": "wnd[0]",
+          "action": "SEND_VKEY",
+          "binding": {
+            "type": "literal",
+            "value": "Enter"
+          },
+          "row_binding": {
+            "type": "literal",
+            "value": ""
+          },
+          "optional": false,
+          "capture": null
+        },
+        {
+          "module": "VF01",
+          "attribute": "delivery_number_cell",
+          "component_id": null,
+          "action": "SET",
+          "binding": {
+            "type": "buffer",
+            "value": "delivery_number"
+          },
+          "row_binding": {
+            "type": "literal",
+            "value": ""
+          },
+          "optional": false,
+          "capture": null
+        },
+        {
+          "module": "VF01",
+          "attribute": "save_button",
+          "component_id": null,
+          "action": "PRESS",
+          "binding": {
+            "type": "literal",
+            "value": ""
+          },
+          "row_binding": {
+            "type": "literal",
+            "value": ""
+          },
+          "optional": false,
+          "capture": {
+            "buffer": "billing_number",
+            "from": "statusbar",
+            "pattern": "billing_saved"
+          }
+        }
+      ]
+    },
+    {
+      "name": "VL01N_CreateDelivery",
+      "description": "O2C step 2: create the outbound delivery for the order.",
+      "steps": [
+        {
+          "module": "VL01N",
+          "attribute": "okcd",
+          "component_id": null,
+          "action": "SET",
+          "binding": {
+            "type": "literal",
+            "value": "/nVL01N"
+          },
+          "row_binding": {
+            "type": "literal",
+            "value": ""
+          },
+          "optional": false,
+          "capture": null
+        },
+        {
+          "module": null,
+          "attribute": null,
+          "component_id": "wnd[0]",
+          "action": "SEND_VKEY",
+          "binding": {
+            "type": "literal",
+            "value": "Enter"
+          },
+          "row_binding": {
+            "type": "literal",
+            "value": ""
+          },
+          "optional": false,
+          "capture": null
+        },
+        {
+          "module": "VL01N",
+          "attribute": "order_number",
+          "component_id": null,
+          "action": "SET",
+          "binding": {
+            "type": "buffer",
+            "value": "order_number"
+          },
+          "row_binding": {
+            "type": "literal",
+            "value": ""
+          },
+          "optional": false,
+          "capture": null
+        },
+        {
+          "module": "VL01N",
+          "attribute": "shipping_point",
+          "component_id": null,
+          "action": "SET",
+          "binding": {
+            "type": "column",
+            "value": "shipping_point"
+          },
+          "row_binding": {
+            "type": "literal",
+            "value": ""
+          },
+          "optional": false,
+          "capture": null
+        },
+        {
+          "module": "VL01N",
+          "attribute": "selection_date",
+          "component_id": null,
+          "action": "SET",
+          "binding": {
+            "type": "column",
+            "value": "selection_date"
+          },
+          "row_binding": {
+            "type": "literal",
+            "value": ""
+          },
+          "optional": false,
+          "capture": null
+        },
+        {
+          "module": null,
+          "attribute": null,
+          "component_id": "wnd[0]",
+          "action": "SEND_VKEY",
+          "binding": {
+            "type": "literal",
+            "value": "Enter"
+          },
+          "row_binding": {
+            "type": "literal",
+            "value": ""
+          },
+          "optional": false,
+          "capture": null
+        },
+        {
+          "module": "VL01N",
+          "attribute": "save_button",
+          "component_id": null,
+          "action": "PRESS",
+          "binding": {
+            "type": "literal",
+            "value": ""
+          },
+          "row_binding": {
+            "type": "literal",
+            "value": ""
+          },
+          "optional": false,
+          "capture": {
+            "buffer": "delivery_number",
+            "from": "statusbar",
+            "pattern": "delivery_saved"
+          }
+        }
+      ]
+    },
+    {
+      "name": "VL02N_PostGoodsIssue",
+      "description": "O2C step 3: post goods issue on the delivery.",
+      "steps": [
+        {
+          "module": "VL02N",
+          "attribute": "okcd",
+          "component_id": null,
+          "action": "SET",
+          "binding": {
+            "type": "literal",
+            "value": "/nVL02N"
+          },
+          "row_binding": {
+            "type": "literal",
+            "value": ""
+          },
+          "optional": false,
+          "capture": null
+        },
+        {
+          "module": null,
+          "attribute": null,
+          "component_id": "wnd[0]",
+          "action": "SEND_VKEY",
+          "binding": {
+            "type": "literal",
+            "value": "Enter"
+          },
+          "row_binding": {
+            "type": "literal",
+            "value": ""
+          },
+          "optional": false,
+          "capture": null
+        },
+        {
+          "module": "VL02N",
+          "attribute": "delivery_number",
+          "component_id": null,
+          "action": "SET",
+          "binding": {
+            "type": "buffer",
+            "value": "delivery_number"
+          },
+          "row_binding": {
+            "type": "literal",
+            "value": ""
+          },
+          "optional": false,
+          "capture": null
+        },
+        {
+          "module": null,
+          "attribute": null,
+          "component_id": "wnd[0]",
+          "action": "SEND_VKEY",
+          "binding": {
+            "type": "literal",
+            "value": "Enter"
+          },
+          "row_binding": {
+            "type": "literal",
+            "value": ""
+          },
+          "optional": false,
+          "capture": null
+        },
+        {
+          "module": "VL02N",
+          "attribute": "storage_location_cell",
+          "component_id": null,
+          "action": "TABLE_SET_CELL",
+          "binding": {
+            "type": "column",
+            "value": "storage_location"
+          },
+          "row_binding": {
+            "type": "literal",
+            "value": "0"
+          },
+          "optional": false,
+          "capture": null
+        },
+        {
+          "module": "VL02N",
+          "attribute": "picked_qty_cell",
+          "component_id": null,
+          "action": "TABLE_SET_CELL",
+          "binding": {
+            "type": "column",
+            "value": "picked_qty"
+          },
+          "row_binding": {
+            "type": "literal",
+            "value": "0"
+          },
+          "optional": false,
+          "capture": null
+        },
+        {
+          "module": "VL02N",
+          "attribute": "actual_gi_date",
+          "component_id": null,
+          "action": "SET",
+          "binding": {
+            "type": "column",
+            "value": "actual_gi_date"
+          },
+          "row_binding": {
+            "type": "literal",
+            "value": ""
+          },
+          "optional": false,
+          "capture": null
+        },
+        {
+          "module": null,
+          "attribute": null,
+          "component_id": "wnd[0]",
+          "action": "SEND_VKEY",
+          "binding": {
+            "type": "literal",
+            "value": "Enter"
+          },
+          "row_binding": {
+            "type": "literal",
+            "value": ""
+          },
+          "optional": false,
+          "capture": null
+        },
+        {
+          "module": "VL02N",
+          "attribute": "post_goods_issue_button",
+          "component_id": null,
+          "action": "PRESS",
+          "binding": {
+            "type": "literal",
+            "value": ""
+          },
+          "row_binding": {
+            "type": "literal",
+            "value": ""
+          },
+          "optional": false,
+          "capture": null
+        }
+      ]
+    }
+  ]
+}
