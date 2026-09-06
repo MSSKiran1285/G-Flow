@@ -296,6 +296,7 @@ def save_module(
     root_id: str,
     screen_number: str = "",
     attributes: list[ScannedComponent] | list[dict],
+    folder: str = "",
 ) -> tuple[str, int]:
     """Persists a Module with exactly the given attributes — the curated (possibly
     filtered, possibly renamed) subset of a scan_screen_preview result. Re-saving an
@@ -306,7 +307,7 @@ def save_module(
             db.delete(existing)
             db.flush()
 
-        module = Module(name=module_name, tcode=tcode, screen_number=screen_number, root_id=root_id)
+        module = Module(name=module_name, tcode=tcode, screen_number=screen_number, root_id=root_id, folder=folder)
         db.add(module)
 
         count = 0
@@ -323,6 +324,7 @@ def save_module(
                 caption=attr.get("caption", ""),
                 window_title=attr.get("window_title", ""),
                 supported_action_modes=",".join(modes) if isinstance(modes, list) else (modes or ""),
+                direction=attr.get("direction", "input"),
             ))
             count += 1
 
@@ -341,6 +343,7 @@ def scan_module(
     navigate: bool = True,
     prefill: dict[str, str] | None = None,
     vkeys_before_scan: list[str] | None = None,
+    folder: str = "",
 ) -> tuple[str, int]:
     """All-in-one scan + persist-everything, kept for the CLI's `scan-module` command
     and any batch/quick-scan use. The script-builder UI instead drives
@@ -353,5 +356,5 @@ def scan_module(
     )
     return save_module(
         session_factory, module_name=module_name, tcode=tcode, root_id=root_id,
-        screen_number=screen_number, attributes=components,
+        screen_number=screen_number, attributes=components, folder=folder,
     )

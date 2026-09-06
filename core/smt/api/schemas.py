@@ -40,6 +40,7 @@ class ModuleAttributeOut(BaseModel):
     caption: str = ""
     window_title: str = ""
     supported_action_modes: list[str]
+    direction: Literal["input", "output"] = "input"
 
 
 class ModuleSummary(BaseModel):
@@ -49,6 +50,7 @@ class ModuleSummary(BaseModel):
     screen_number: str
     scanned_at: datetime
     attribute_count: int
+    folder: str = ""
 
 
 class ModuleDetail(ModuleSummary):
@@ -64,6 +66,7 @@ class ScanModuleRequest(BaseModel):
     prefill: dict[str, str] = {}
     vkeys_before_scan: list[str] = []
     connection_id: str | None = None
+    folder: str = ""
 
 
 class ScanModuleResponse(BaseModel):
@@ -109,6 +112,7 @@ class SelectedAttribute(BaseModel):
     caption: str = ""
     window_title: str = ""
     supported_action_modes: list[str] = []
+    direction: Literal["input", "output"] = "input"
 
 
 class SaveModuleRequest(BaseModel):
@@ -117,6 +121,7 @@ class SaveModuleRequest(BaseModel):
     root_id: str = "wnd[0]"
     screen_number: str = ""
     attributes: list[SelectedAttribute]
+    folder: str = ""
 
 
 # --- live element picker (Ctrl+Click capture) ---

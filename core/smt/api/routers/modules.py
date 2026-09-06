@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session, sessionmaker
 
 from smt.adapter.generated import uiadapter_pb2 as pb
@@ -44,7 +44,7 @@ def _to_out(c: ScannedComponent) -> ScannedComponentOut:
 def _to_summary(module: Module) -> ModuleSummary:
     return ModuleSummary(
         id=module.id, name=module.name, tcode=module.tcode, screen_number=module.screen_number,
-        scanned_at=module.scanned_at, attribute_count=len(module.attributes),
+        scanned_at=module.scanned_at, attribute_count=len(module.attributes), folder=module.folder,
     )
 
 
@@ -69,6 +69,7 @@ def get_module(name: str, session_factory: sessionmaker[Session] = Depends(get_s
                     sap_type=a.sap_type, sap_sub_type=a.sap_sub_type, label=a.label, caption=a.caption,
                     window_title=a.window_title,
                     supported_action_modes=[m for m in a.supported_action_modes.split(",") if m],
+                    direction=a.direction,
                 )
                 for a in module.attributes
             ],
@@ -92,6 +93,7 @@ def scan_module_endpoint(
             agent, handle, session_factory,
             module_name=body.module_name, tcode=body.tcode, root_id=body.root_id,
             navigate=body.navigate, prefill=body.prefill, vkeys_before_scan=body.vkeys_before_scan,
+            folder=body.folder,
         )
     finally:
         agent.close_session(handle)
@@ -133,8 +135,20 @@ def save_module_endpoint(
     module_id, count = save_module(
         session_factory, module_name=body.module_name, tcode=body.tcode, root_id=body.root_id,
         screen_number=body.screen_number, attributes=[a.model_dump() for a in body.attributes],
+        folder=body.folder,
     )
     return ScanModuleResponse(module_id=module_id, module_name=body.module_name, attribute_count=count)
+
+
+@router.delete("/modules/{name}", status_code=204, response_class=Response)
+def delete_module_endpoint(name: str, session_factory: sessionmaker[Session] = Depends(get_session_factory)) -> Response:
+    with session_factory() as db:
+        module = db.query(Module).filter_by(name=name).one_or_none()
+        if module is None:
+            raise HTTPException(status_code=404, detail=f"no Module named {name!r}")
+        db.delete(module)
+        db.commit()
+    return Response(status_code=204)
 
 
 @router.post("/modules/highlight", response_model=HighlightResponse)

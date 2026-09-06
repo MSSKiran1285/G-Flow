@@ -36,6 +36,9 @@ class Module(Base):
     screen_number: Mapped[str] = mapped_column(String(10), default="")
     root_id: Mapped[str] = mapped_column(String(500))
     scanned_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    # Free-text grouping for the Object Library's folder tree (e.g. "Sales", "Purchasing")
+    # — "" means ungrouped/untagged. Purely organizational, no behavior depends on it.
+    folder: Mapped[str] = mapped_column(String(100), default="")
 
     attributes: Mapped[list["ModuleAttribute"]] = relationship(
         back_populates="module", cascade="all, delete-orphan", order_by="ModuleAttribute.component_id"
@@ -65,6 +68,12 @@ class ModuleAttribute(Base):
     # originating screen/dialog instead of one flat list.
     window_title: Mapped[str] = mapped_column(String(300), default="")
     supported_action_modes: Mapped[str] = mapped_column(Text, default="")  # comma-separated
+    # "input" (a script SETs this) | "output" (this attribute's action is expected to
+    # produce a capturable result, e.g. pressing Save then parsing the statusbar) — set
+    # once at capture time so the Scripts module can show the right editor (a value
+    # binding for inputs, a capture/buffer binding for outputs) instead of one generic
+    # control for every attribute regardless of its role.
+    direction: Mapped[str] = mapped_column(String(10), default="input")
 
     module: Mapped[Module] = relationship(back_populates="attributes")
 

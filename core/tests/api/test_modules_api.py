@@ -216,6 +216,74 @@ def test_save_module_persists_the_caption(client):
     assert detail["attributes"][0]["caption"] == "Distribution Channel"
 
 
+def test_save_module_persists_the_folder(client):
+    c, _agent = client
+
+    r = c.post("/api/modules", json={
+        "module_name": "VA01_WithFolder",
+        "tcode": "VA01",
+        "folder": "Sales",
+        "attributes": [
+            {"semantic_name": "order_type", "component_id": "wnd[0]/usr/ctxtVBAK-AUART", "sap_type": "GuiCTextField"},
+        ],
+    })
+    assert r.status_code == 200
+
+    assert c.get("/api/modules/VA01_WithFolder").json()["folder"] == "Sales"
+    listed = {m["name"]: m["folder"] for m in c.get("/api/modules").json()}
+    assert listed["VA01_WithFolder"] == "Sales"
+
+
+def test_delete_module(client):
+    c, _agent = client
+
+    r = c.post("/api/modules", json={
+        "module_name": "VA01_ToDelete",
+        "tcode": "VA01",
+        "attributes": [
+            {"semantic_name": "order_type", "component_id": "wnd[0]/usr/ctxtVBAK-AUART", "sap_type": "GuiCTextField"},
+        ],
+    })
+    assert r.status_code == 200
+
+    r = c.delete("/api/modules/VA01_ToDelete")
+    assert r.status_code == 204
+    assert c.get("/api/modules/VA01_ToDelete").status_code == 404
+
+
+def test_delete_unknown_module_returns_404(client):
+    c, _agent = client
+    assert c.delete("/api/modules/DoesNotExist").status_code == 404
+
+
+def test_save_module_persists_the_direction(client):
+    c, _agent = client
+
+    r = c.post("/api/modules", json={
+        "module_name": "VA01_WithDirection",
+        "tcode": "VA01",
+        "attributes": [
+            {
+                "semantic_name": "save_button",
+                "component_id": "wnd[0]/tbar[0]/btn[11]",
+                "sap_type": "GuiButton",
+                "direction": "output",
+            },
+            {
+                "semantic_name": "order_type",
+                "component_id": "wnd[0]/usr/ctxtVBAK-AUART",
+                "sap_type": "GuiCTextField",
+                "direction": "input",
+            },
+        ],
+    })
+    assert r.status_code == 200
+
+    detail = c.get("/api/modules/VA01_WithDirection").json()
+    by_name = {a["semantic_name"]: a["direction"] for a in detail["attributes"]}
+    assert by_name == {"save_button": "output", "order_type": "input"}
+
+
 def test_save_module_persists_only_the_curated_selection(client):
     c, _agent = client
 
