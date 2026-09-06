@@ -1,7 +1,14 @@
 import { Crosshair, MousePointerClick, Plus, Trash2, X } from "lucide-react";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { api, ApiError } from "../../api";
-import type { ScannedComponentOut } from "../../types";
+import type { AttributeDirection, ScannedComponentOut } from "../../types";
+
+/** A button/menu's action is almost always the "output" side of a step (pressing it
+ * triggers something to capture); everything else defaults to "input". Just a
+ * starting point — the tester can flip any row in the review step. */
+function defaultDirection(c: ScannedComponentOut): AttributeDirection {
+  return c.sap_type === "GuiButton" || c.sap_type === "GuiMenu" ? "output" : "input";
+}
 
 interface PrefillPair {
   componentId: string;
@@ -27,12 +34,29 @@ function groupByWindow(components: ScannedComponentOut[]): [string, ScannedCompo
   return order.map((key) => [key, groups.get(key)!]);
 }
 
-export function ScanModuleDialog({ onClose, onScanned }: { onClose: () => void; onScanned: () => void }) {
+interface EditTarget {
+  moduleName: string;
+  tcode: string;
+  folder: string;
+}
+
+export function ScanModuleDialog({
+  initial,
+  onClose,
+  onScanned,
+}: {
+  /** Present when re-scanning an existing Module (re-saving under the same name
+   * replaces it — see save_module) rather than capturing a brand new one. */
+  initial?: EditTarget;
+  onClose: () => void;
+  onScanned: () => void;
+}) {
   const [step, setStep] = useState<Step>("configure");
 
   // --- configure step state ---
-  const [moduleName, setModuleName] = useState("");
-  const [tcode, setTcode] = useState("");
+  const [moduleName, setModuleName] = useState(initial?.moduleName ?? "");
+  const [tcode, setTcode] = useState(initial?.tcode ?? "");
+  const [folder, setFolder] = useState(initial?.folder ?? "");
   const [rootId, setRootId] = useState("wnd[0]");
   const [navigate, setNavigate] = useState(true);
   const [prefill, setPrefill] = useState<PrefillPair[]>([]);
@@ -42,6 +66,7 @@ export function ScanModuleDialog({ onClose, onScanned }: { onClose: () => void; 
   const [captureId, setCaptureId] = useState<string | null>(null);
   const [picked, setPicked] = useState<ScannedComponentOut[]>([]);
   const [names, setNames] = useState<Record<string, string>>({});
+  const [directions, setDirections] = useState<Record<string, AttributeDirection>>({});
   const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const [busy, setBusy] = useState(false);
@@ -57,6 +82,11 @@ export function ScanModuleDialog({ onClose, onScanned }: { onClose: () => void; 
     setNames((prev) => {
       const next = { ...prev };
       for (const c of incoming) if (!(c.component_id in next)) next[c.component_id] = c.semantic_name;
+      return next;
+    });
+    setDirections((prev) => {
+      const next = { ...prev };
+      for (const c of incoming) if (!(c.component_id in next)) next[c.component_id] = defaultDirection(c);
       return next;
     });
   };
@@ -78,6 +108,7 @@ export function ScanModuleDialog({ onClose, onScanned }: { onClose: () => void; 
       setCaptureId(result.capture_id);
       setPicked([]);
       setNames({});
+      setDirections({});
       setStep("capturing");
       pollTimer.current = setInterval(async () => {
         try {
@@ -150,8 +181,9 @@ export function ScanModuleDialog({ onClose, onScanned }: { onClose: () => void; 
         caption: c.caption,
         window_title: c.window_title,
         supported_action_modes: c.supported_action_modes,
+        direction: directions[c.component_id] ?? defaultDirection(c),
       }));
-      await api.saveModule({ module_name: moduleName, tcode, root_id: rootId, attributes });
+      await api.saveModule({ module_name: moduleName, tcode, root_id: rootId, attributes, folder });
       onScanned();
       onClose();
     } catch (e) {
@@ -173,7 +205,7 @@ export function ScanModuleDialog({ onClose, onScanned }: { onClose: () => void; 
       >
         <div className="dialog-header">
           <h3 id="scan-title">
-            {step === "configure" && "Pick fields from a screen"}
+            {step === "configure" && (initial ? `Update fields for ${initial.moduleName}` : "Pick fields from a screen")}
             {step === "capturing" && "Capturing… Ctrl+Click fields in SAP"}
             {step === "review" && `Review ${picked.length} captured field${picked.length === 1 ? "" : "s"}`}
           </h3>
@@ -190,11 +222,29 @@ export function ScanModuleDialog({ onClose, onScanned }: { onClose: () => void; 
             <>
               <div className="field">
                 <label htmlFor="module-name">Module name</label>
-                <input id="module-name" type="text" value={moduleName} onChange={(e) => setModuleName(e.target.value)} placeholder="e.g. ME21N_InitialScreen" />
+                <input
+                  id="module-name"
+                  type="text"
+                  value={moduleName}
+                  onChange={(e) => setModuleName(e.target.value)}
+                  placeholder="e.g. ME21N_InitialScreen"
+                  disabled={Boolean(initial)}
+                  title={initial ? "Renaming here would create a separate module instead of updating this one" : undefined}
+                />
               </div>
               <div className="field">
                 <label htmlFor="tcode">Transaction code</label>
                 <input id="tcode" type="text" value={tcode} onChange={(e) => setTcode(e.target.value.toUpperCase())} placeholder="e.g. ME21N" />
+              </div>
+              <div className="field">
+                <label htmlFor="module-folder">Folder</label>
+                <input
+                  id="module-folder"
+                  type="text"
+                  value={folder}
+                  onChange={(e) => setFolder(e.target.value)}
+                  placeholder="e.g. Sales — leave blank to leave it untagged"
+                />
               </div>
               <details className="details-advanced">
                 <summary>Advanced (root id, prefill, navigation)</summary>
@@ -263,7 +313,7 @@ export function ScanModuleDialog({ onClose, onScanned }: { onClose: () => void; 
                     <tr>
                       <th />
                       <th>Name</th>
-                      <th>English name</th>
+                      <th>Caption</th>
                       <th>Value</th>
                       <th>Type</th>
                       <th>Component id</th>
@@ -316,9 +366,10 @@ export function ScanModuleDialog({ onClose, onScanned }: { onClose: () => void; 
                     <th />
                     <th />
                     <th>Name</th>
-                    <th>English name</th>
+                    <th>Caption</th>
                     <th>Value</th>
                     <th>Type</th>
+                    <th>Direction</th>
                     <th>Component id</th>
                   </tr>
                 </thead>
@@ -326,7 +377,7 @@ export function ScanModuleDialog({ onClose, onScanned }: { onClose: () => void; 
                   {groupByWindow(picked).map(([windowTitle, rows]) => (
                     <Fragment key={windowTitle}>
                       <tr className="table-group-row">
-                        <td colSpan={7}>{windowTitle}</td>
+                        <td colSpan={8}>{windowTitle}</td>
                       </tr>
                       {rows.map((c) => (
                         <tr key={c.component_id}>
@@ -357,6 +408,17 @@ export function ScanModuleDialog({ onClose, onScanned }: { onClose: () => void; 
                           <td>{c.caption || <span className="breadcrumb">—</span>}</td>
                           <td>{c.label}</td>
                           <td className="breadcrumb">{c.sap_type}</td>
+                          <td>
+                            <select
+                              value={directions[c.component_id] ?? defaultDirection(c)}
+                              onChange={(e) =>
+                                setDirections({ ...directions, [c.component_id]: e.target.value as AttributeDirection })
+                              }
+                            >
+                              <option value="input">Input</option>
+                              <option value="output">Output</option>
+                            </select>
+                          </td>
                           <td style={{ font: "var(--text-code)" }}>{c.component_id}</td>
                         </tr>
                       ))}

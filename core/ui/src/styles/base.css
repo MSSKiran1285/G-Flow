@@ -69,6 +69,23 @@ table {
   padding: 0 var(--space-3) var(--space-4);
 }
 
+/* The logo art is a single black-line-on-transparent PNG (see public/gflow-mark.png)
+   — inverting it to white on dark backgrounds is simpler and crisper than maintaining
+   two separate raster files. */
+.app-logo {
+  filter: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .app-logo {
+    filter: invert(1);
+  }
+}
+
+:root[data-theme="dark"] .app-logo {
+  filter: invert(1);
+}
+
 .nav-item {
   display: flex;
   align-items: center;

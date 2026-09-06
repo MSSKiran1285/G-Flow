@@ -53,6 +53,8 @@ export const api = {
     request<ScanPreviewResponse>("/api/modules/scan-preview", { method: "POST", body: JSON.stringify(body) }),
   saveModule: (body: SaveModuleRequest) =>
     request<ScanModuleResponse>("/api/modules", { method: "POST", body: JSON.stringify(body) }),
+  deleteModule: (name: string) =>
+    request<void>(`/api/modules/${encodeURIComponent(name)}`, { method: "DELETE" }),
   startCapture: (body: StartCaptureRequest) =>
     request<StartCaptureResponse>("/api/modules/capture/start", { method: "POST", body: JSON.stringify(body) }),
   pollCapture: (captureId: string) =>

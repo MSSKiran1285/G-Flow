@@ -1,8 +1,9 @@
 import { Blocks, GitBranch, ScrollText } from "lucide-react";
 import type { View } from "../../App";
+import { GFlowLogo } from "./GFlowLogo";
 
 const NAV: { id: View; label: string; icon: typeof Blocks }[] = [
-  { id: "modules", label: "Modules", icon: Blocks },
+  { id: "modules", label: "Object Library", icon: Blocks },
   { id: "scripts", label: "Scripts", icon: ScrollText },
   { id: "chains", label: "Chains", icon: GitBranch },
 ];
@@ -10,7 +11,10 @@ const NAV: { id: View; label: string; icon: typeof Blocks }[] = [
 export function Sidebar({ view, onChange }: { view: View; onChange: (v: View) => void }) {
   return (
     <nav className="sidebar" aria-label="Workspaces">
-      <div className="sidebar-brand">SapModelTest</div>
+      <div className="sidebar-brand" style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+        <GFlowLogo size={22} />
+        G-Flow
+      </div>
       {NAV.map(({ id, label, icon: Icon }) => (
         <button
           key={id}

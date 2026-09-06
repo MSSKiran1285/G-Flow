@@ -1,7 +1,7 @@
 import { SapConnectionPill } from "./SapConnectionPill";
 
 const TITLES: Record<string, string> = {
-  modules: "Modules",
+  modules: "Object Library",
   scripts: "Scripts",
   chains: "Chains",
 };
