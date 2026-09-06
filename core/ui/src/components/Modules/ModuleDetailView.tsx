@@ -1,4 +1,4 @@
-import { Crosshair, Pencil, Trash2 } from "lucide-react";
+import { Crosshair, Info, Pencil, Trash2 } from "lucide-react";
 import { Fragment, useEffect, useState } from "react";
 import { api, ApiError } from "../../api";
 import type { ModuleAttributeOut, ModuleDetail } from "../../types";
@@ -99,18 +99,20 @@ export function ModuleDetailView({
       <div className="panel-header">
         <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
           <h2 style={{ margin: 0 }}>{detail.name}</h2>
-          <span className="chip chip-literal">{detail.tcode}</span>
-          <span className="chip chip-literal">{detail.attribute_count} attributes</span>
+          <span className="badge-outline">{detail.tcode}</span>
+          <span className="badge-outline">
+            {detail.attribute_count} attributes <Info size={12} aria-hidden="true" />
+          </span>
+          {detail.folder && <span className="badge-outline">{detail.folder}</span>}
           <span className="chip chip-column">{inputCount} input</span>
           <span className="chip chip-buffer">{outputCount} output</span>
-          {detail.folder && <span className="chip chip-literal">{detail.folder}</span>}
         </div>
       </div>
       <div className="toolbar">
-        <button className="btn" onClick={onEdit} disabled={!onEdit}>
+        <button className="btn btn-toolbar" onClick={onEdit} disabled={!onEdit}>
           <Pencil size={14} /> Edit
         </button>
-        <button className="btn btn-danger" onClick={onDelete} disabled={!onDelete}>
+        <button className="btn btn-danger btn-toolbar" onClick={onDelete} disabled={!onDelete}>
           <Trash2 size={14} /> Delete
         </button>
       </div>

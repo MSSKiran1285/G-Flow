@@ -282,6 +282,32 @@ table {
 }
 
 .chip-literal { background: var(--tag-literal-bg); color: var(--tag-literal-text); }
+
+/* A quieter alternative to .chip for a header's own metadata badges (attribute
+   count, tcode, folder) — outlined rather than solid-filled, so it reads as
+   secondary information next to the page title instead of competing with the
+   semantic (input/output/column/buffer) chip colors used everywhere else. */
+.badge-outline {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border);
+  background: var(--panel-subtle);
+  color: var(--text-muted);
+  font: var(--text-label);
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+/* All-caps action-button label, for a page-level toolbar (vs. normal-case for
+   everything else — form actions like "Save script", "Add step", etc.). */
+.btn-toolbar {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 11px;
+}
 .chip-column { background: var(--tag-column-bg); color: var(--tag-column-text); }
 .chip-buffer { background: var(--tag-buffer-bg); color: var(--tag-buffer-text); }
 
@@ -311,8 +337,12 @@ table {
 }
 
 .data-table th {
+  background: var(--panel-subtle);
   color: var(--text-muted);
-  font-weight: 600;
+  font: var(--text-label);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
 }
 
 .data-table tbody tr.table-group-row td {

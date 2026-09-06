@@ -38,7 +38,7 @@ export function SapConnectionPill() {
   const first = status.connections[0];
   return (
     <span className="status-badge status-pass" title={first.connection_id}>
-      SAP: {first.description || "connected"}
+      SAP · {first.description || "connected"}
     </span>
   );
 }

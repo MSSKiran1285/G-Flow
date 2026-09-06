@@ -58,46 +58,55 @@ export function ModulesPanel() {
     reload();
   };
 
+  const rootCollapsed = collapsed.has("__root__");
+
   return (
     <div style={{ display: "grid", gridTemplateColumns: "320px 1fr", gap: 20, alignItems: "start" }}>
       <div className="panel">
         <div className="panel-header">
           <h2>Object Library</h2>
-        </div>
-        <div className="toolbar">
-          <button className="btn btn-primary" onClick={() => setShowScan(true)}>
-            <Plus size={14} /> Scan new module
+          <button className="icon-btn" aria-label="Scan new module" title="Scan new module" onClick={() => setShowScan(true)}>
+            <Plus size={16} />
           </button>
         </div>
         <div className="table-frame">
           <table className="data-table">
             <tbody>
-              {groups.map(([folder, items]) => (
-                <Fragment key={folder}>
-                  <tr className="table-group-row" style={{ cursor: "pointer" }} onClick={() => toggleFolder(folder)}>
-                    <td style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
-                      {collapsed.has(folder) ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
-                      <Folder size={14} />
-                      {folder}
-                      <span className="chip chip-literal">{items.length}</span>
-                    </td>
-                  </tr>
-                  {!collapsed.has(folder) &&
-                    items.map((m) => (
-                      <tr
-                        key={m.id}
-                        className={selected === m.name ? "selected" : undefined}
-                        onClick={() => setSelected(m.name)}
-                        style={{ cursor: "pointer" }}
-                      >
-                        <td style={{ paddingLeft: "var(--space-6)" }}>
-                          <div>{m.name}</div>
-                          <div className="breadcrumb">{m.tcode} · {m.attribute_count} attrs</div>
-                        </td>
-                      </tr>
-                    ))}
-                </Fragment>
-              ))}
+              <tr className="table-group-row" style={{ cursor: "pointer" }} onClick={() => toggleFolder("__root__")}>
+                <td style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", fontWeight: 600 }}>
+                  {rootCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+                  <Folder size={14} />
+                  Repositories
+                  <span className="chip chip-literal">{groups.length}</span>
+                </td>
+              </tr>
+              {!rootCollapsed &&
+                groups.map(([folder, items]) => (
+                  <Fragment key={folder}>
+                    <tr className="table-group-row" style={{ cursor: "pointer" }} onClick={() => toggleFolder(folder)}>
+                      <td style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", paddingLeft: "var(--space-5)" }}>
+                        {collapsed.has(folder) ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+                        <Folder size={14} />
+                        {folder}
+                        <span className="chip chip-literal">{items.length}</span>
+                      </td>
+                    </tr>
+                    {!collapsed.has(folder) &&
+                      items.map((m) => (
+                        <tr
+                          key={m.id}
+                          className={selected === m.name ? "selected" : undefined}
+                          onClick={() => setSelected(m.name)}
+                          style={{ cursor: "pointer" }}
+                        >
+                          <td style={{ paddingLeft: "var(--space-6)" }}>
+                            <div>{m.name}</div>
+                            <div className="breadcrumb">{m.tcode} · {m.attribute_count} attrs</div>
+                          </td>
+                        </tr>
+                      ))}
+                  </Fragment>
+                ))}
               {modules.length === 0 && (
                 <tr>
                   <td className="empty-state">No modules scanned yet.</td>
@@ -106,6 +115,14 @@ export function ModulesPanel() {
             </tbody>
           </table>
         </div>
+        <div className="toolbar" style={{ borderTop: "none" }}>
+          <button className="btn btn-primary" style={{ width: "100%", justifyContent: "center" }} onClick={() => setShowScan(true)}>
+            <Plus size={14} /> Scan new module
+          </button>
+        </div>
+        <p className="breadcrumb" style={{ textAlign: "center", padding: "0 var(--space-3) var(--space-3)" }}>
+          {groups.length} folder{groups.length === 1 ? "" : "s"} · {modules.length} module{modules.length === 1 ? "" : "s"}
+        </p>
       </div>
 
       {selected ? (
