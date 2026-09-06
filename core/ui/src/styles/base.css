@@ -20,8 +20,15 @@ button, input, select, textarea {
 }
 
 :focus-visible {
-  outline: 2px solid var(--selected-bg);
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
 }
 
 table {
@@ -74,10 +81,12 @@ table {
   text-align: left;
   font: var(--text-body);
   cursor: pointer;
+  transition: background-color var(--transition-fast), transform var(--transition-fast);
 }
 
 .nav-item:hover {
   background: var(--border);
+  transform: translateX(2px);
 }
 
 .nav-item[aria-current="page"] {
@@ -155,15 +164,48 @@ table {
   color: var(--text);
   font: var(--text-body);
   cursor: pointer;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast),
+    color var(--transition-fast), transform var(--transition-fast);
 }
 
 .btn:hover {
   background: var(--border);
+  transform: translateY(-1px);
+}
+
+.btn:active {
+  transform: translateY(0);
 }
 
 .btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  transform: none;
+}
+
+/* Default/secondary/outline/ghost span a deliberate scale of visual weight — same
+   shape and size, one primary CTA per screen (.btn-primary), a neutral default
+   (bare .btn) for everything else, and lighter-weight variants for dense toolbars
+   where a bordered button per action would be too heavy. */
+.btn-secondary {
+  background: var(--panel-subtle);
+  border-color: var(--panel-subtle);
+}
+
+.btn-outline {
+  background: transparent;
+  border-color: var(--border);
+}
+
+.btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-muted);
+}
+
+.btn-ghost:hover {
+  background: var(--panel-subtle);
+  color: var(--text);
 }
 
 .btn-primary {
@@ -216,7 +258,7 @@ table {
   align-items: center;
   gap: var(--space-1);
   padding: 2px var(--space-2);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   font: var(--text-label);
   text-transform: none;
   letter-spacing: normal;
@@ -231,7 +273,7 @@ table {
   align-items: center;
   gap: var(--space-1);
   padding: 2px var(--space-2);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   font: var(--text-label);
 }
 
@@ -265,6 +307,12 @@ table {
   white-space: normal;
 }
 
+/* Row hover is a neutral tint, deliberately not the accent/selected color — a
+   hovered row and a selected row must stay visually distinct. */
+.data-table tbody tr:not(.table-group-row):not(.selected):hover {
+  background: var(--row-hover);
+}
+
 .data-table tbody tr.selected {
   background: var(--selected-bg);
   color: var(--selected-text);
@@ -296,6 +344,7 @@ table {
   padding: var(--space-1);
   border-radius: var(--radius-sm);
   cursor: pointer;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
 }
 
 .icon-btn:hover {
@@ -306,6 +355,12 @@ table {
 .icon-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.field-hint {
+  font: var(--text-caption);
+  color: var(--text-muted);
+  margin: 0 0 var(--space-2);
 }
 
 .empty-state {
@@ -321,7 +376,8 @@ table {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 100;
+  z-index: var(--z-dialog);
+  animation: fade-in 0.15s ease-out;
 }
 
 .dialog {
@@ -332,6 +388,17 @@ table {
   max-height: 88vh;
   display: flex;
   flex-direction: column;
+  animation: pop-dialog-in 0.12s ease-out;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes pop-dialog-in {
+  from { opacity: 0; transform: scale(0.97) translateY(4px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
 }
 
 .dialog-header {

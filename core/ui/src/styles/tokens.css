@@ -11,6 +11,7 @@
   --text-body: 400 14px/1.5 var(--font-sans);
   --text-table-cell: 400 13px/1.4 var(--font-sans);
   --text-label: 600 11px/1.3 var(--font-sans);
+  --text-caption: 400 12px/1.45 var(--font-sans);
   --text-code: 400 12.5px/1.5 var(--font-mono);
 
   /* Spacing / radius / shadow scale */
@@ -23,29 +24,51 @@
   --radius-sm: 4px;
   --radius-md: 8px;
   --radius-lg: 12px;
+  --radius-full: 9999px;
   --shadow-sm: 0 1px 2px rgb(0 0 0 / 8%);
   --shadow-md: 0 4px 12px rgb(0 0 0 / 12%);
+
+  /* Motion — one timing for hover/color/background micro-interactions, a slower
+     springier one for panel/drawer open-close (G-Stride's convention). */
+  --transition-fast: 0.15s ease-in-out;
+  --transition-panel: 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Focus ring — a soft glow (not a hard outline) drawn from the same "selected"
+     color used for active nav items/rows/tabs, so keyboard focus reads as part
+     of the same interaction language rather than a bolted-on browser default. */
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--selected-bg) 35%, transparent);
+
+  /* Stacking order — every fixed-position overlay should reference one of these,
+     not a hand-picked number. */
+  --z-drawer: 60;
+  --z-dialog: 100;
 
   /* Light theme */
   --bg-light: #f7f8fa;
   --panel-light: #ffffff;
+  --panel-light-subtle: #f1f2f5;
   --border-light: #e2e6ec;
   --text-light: #1c2430;
   --text-light-muted: #616e80;
+  --row-hover-light: #edf0f4;
 
   /* Dark theme */
   --bg-dark: #0d1117;
   --panel-dark: #161b22;
+  --panel-dark-subtle: #1e242d;
   --border-dark: #2a3240;
   --text-dark: #eaeef2;
   --text-dark-muted: #8a96a6;
+  --row-hover-dark: #1c2330;
 
   /* Active mapping — light by default */
   --bg: var(--bg-light);
   --panel: var(--panel-light);
+  --panel-subtle: var(--panel-light-subtle);
   --border: var(--border-light);
   --text: var(--text-light);
   --text-muted: var(--text-light-muted);
+  --row-hover: var(--row-hover-light);
 
   /* The one solid "selected" color — every selected row/tab/nav-item uses this */
   --selected-bg: #3a4a63;
@@ -76,16 +99,20 @@
   :root:not([data-theme="light"]) {
     --bg: var(--bg-dark);
     --panel: var(--panel-dark);
+    --panel-subtle: var(--panel-dark-subtle);
     --border: var(--border-dark);
     --text: var(--text-dark);
     --text-muted: var(--text-dark-muted);
+    --row-hover: var(--row-hover-dark);
   }
 }
 
 :root[data-theme="dark"] {
   --bg: var(--bg-dark);
   --panel: var(--panel-dark);
+  --panel-subtle: var(--panel-dark-subtle);
   --border: var(--border-dark);
   --text: var(--text-dark);
   --text-muted: var(--text-dark-muted);
+  --row-hover: var(--row-hover-dark);
 }
