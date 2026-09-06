@@ -3,6 +3,7 @@ using System.Drawing.Imaging;
 using Google.Protobuf;
 using SapGuiAgent.Com;
 using SapGuiAgent.Grpc;
+using SapGuiAgent.Native;
 
 namespace SapGuiAgent.Scanning;
 
@@ -13,6 +14,11 @@ public sealed class ScreenshotService
 {
     public ImageBlob Capture(IComComponent component)
     {
+        // A raw screen-coordinate pixel grab below photographs whatever window is actually
+        // on top at that screen region — bring the real SAP window frontmost (and restore
+        // it if minimized) first, or an overlapping/covering window silently wins.
+        WindowFocus.BringSapWindowToForeground();
+
         var native = new ComHandle(component.Native);
         var left = ComHandle.TryGet(() => native.GetInt("ScreenLeft"), 0);
         var top = ComHandle.TryGet(() => native.GetInt("ScreenTop"), 0);
