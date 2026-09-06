@@ -96,7 +96,7 @@ export function ModuleDetailView({ name }: { name: string }) {
                     <tr key={a.id}>
                       <td style={{ width: 1 }}>
                         <button
-                          className="drag-handle"
+                          className="icon-btn"
                           aria-label={`Highlight ${a.component_id} on screen`}
                           title="Highlight this field on the live SAP screen"
                           disabled={highlighting === a.component_id}

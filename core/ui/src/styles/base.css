@@ -283,6 +283,31 @@ table {
   padding: var(--space-1);
 }
 
+/* For a plain click action rendered as a bare icon (highlight, remove) — unlike
+   .drag-handle, this needs a "clickable", not "draggable", affordance: a pointer
+   cursor and a visible hover state so it doesn't read as decorative. */
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  padding: var(--space-1);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.icon-btn:hover {
+  background: var(--border);
+  color: var(--text);
+}
+
+.icon-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .empty-state {
   color: var(--text-muted);
   text-align: center;

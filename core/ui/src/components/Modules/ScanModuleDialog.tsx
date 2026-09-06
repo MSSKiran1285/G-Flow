@@ -279,7 +279,7 @@ export function ScanModuleDialog({ onClose, onScanned }: { onClose: () => void; 
                           <tr key={c.component_id}>
                             <td style={{ width: 1 }}>
                               <button
-                                className="drag-handle"
+                                className="icon-btn"
                                 aria-label={`Highlight ${c.component_id} on screen`}
                                 title="Highlight this field on the live SAP screen"
                                 disabled={highlighting === c.component_id}
@@ -332,7 +332,7 @@ export function ScanModuleDialog({ onClose, onScanned }: { onClose: () => void; 
                         <tr key={c.component_id}>
                           <td style={{ width: 1 }}>
                             <button
-                              className="drag-handle"
+                              className="icon-btn"
                               aria-label={`Highlight ${c.component_id} on screen`}
                               title="Highlight this field on the live SAP screen"
                               disabled={highlighting === c.component_id}
@@ -342,7 +342,7 @@ export function ScanModuleDialog({ onClose, onScanned }: { onClose: () => void; 
                             </button>
                           </td>
                           <td style={{ width: 1 }}>
-                            <button className="drag-handle" aria-label={`Remove ${c.component_id}`} onClick={() => removePicked(c.component_id)}>
+                            <button className="icon-btn" aria-label={`Remove ${c.component_id}`} onClick={() => removePicked(c.component_id)}>
                               <Trash2 size={14} />
                             </button>
                           </td>
