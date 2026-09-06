@@ -684,3 +684,27 @@ Per spec §13, recorded here rather than re-confirmed inline.
   session) had no way to highlight at all. Opens a short-lived session, highlights,
   closes it — safe to do this freely now that `close_session` no longer touches the
   real window. Live-verified against the real item overview table control.
+- **Added `TestStep.row_binding_type`/`row_binding_value`**, closing the gap noted
+  above that `TABLE_GET_CELL`/`TABLE_SET_CELL` weren't wired into anything at the
+  TestCase level yet: the step's target attribute must be a captured table cell (id
+  ending `...[col,row]`); `executor._parse_table_cell_id` splits that into the
+  table's own component_id + column index, and the new row binding (literal or CSV
+  column, mirroring the existing value binding) supplies which row to actually hit
+  per data row. Live-verified against VA01's item table: wrote and read back row
+  0's quantity cell directly, surviving the subsequent Enter-triggered pricing
+  resolution with a clean statusbar.
+
+## Full O2C E2E round 2, pre-flight (2026-09-06)
+
+Re-checking the proven O2C data (`docs/o2c-config-fixes.md`, orders 1979/1983/1984)
+is still usable before assembling the integrated VA01→VL01N→VL02N→VF01 test through
+the script-builder UI:
+
+- **`MARV` (read via `smt read-table`, read-only) confirms `USAG`'s MM posting
+  period is still `08/2026`** — unchanged since the last `MMPV` run on 2026-08-27.
+  Today (2026-09-06) is a month past it; MM keeps the current + prior period open,
+  so the live window is **July–August 2026**. `LIKP-WADAT_IST` (Actual GI date) on
+  the PGI step must be set to a literal date in that window (e.g. `2026-08-15`),
+  not "today" — confirmed by direct choice not to re-run `MMPV` this round, to keep
+  the test data static rather than re-opening a moving target. Revisit if enough
+  real time passes that even July drops out of the open window.
