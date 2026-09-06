@@ -1,6 +1,12 @@
 import { useEffect, useState } from "react";
 import { api } from "../../api";
-import { PRIMARY_ACTIONS, type ModuleAttributeOut, type ModuleSummary, type StepSpec } from "../../types";
+import {
+  PRIMARY_ACTIONS,
+  TABLE_ACTIONS,
+  type ModuleAttributeOut,
+  type ModuleSummary,
+  type StepSpec,
+} from "../../types";
 import { BindingPicker } from "./BindingPicker";
 import { CaptureFields } from "./CaptureFields";
 
@@ -112,8 +118,28 @@ export function StepEditor({ step, onChange }: { step: StepSpec; onChange: (s: S
 
       <div className="field">
         <label>Binding</label>
-        <BindingPicker value={step.binding} onChange={(binding) => onChange({ ...step, binding })} />
+        <BindingPicker
+          value={step.binding}
+          onChange={(binding) => onChange({ ...step, binding })}
+          types={["literal", "column", "buffer"]}
+        />
       </div>
+
+      {(TABLE_ACTIONS as readonly string[]).includes(step.action) && (
+        <div className="field">
+          <label>Table row</label>
+          <p className="field-hint">
+            The attribute above must be a captured table cell (its id ends "…[col,row]") —
+            the table and column come from that capture; this picks which row to actually
+            hit, so the same step can drive a different line item per data row.
+          </p>
+          <BindingPicker
+            value={step.row_binding}
+            onChange={(row_binding) => onChange({ ...step, row_binding })}
+            types={["literal", "column"]}
+          />
+        </div>
+      )}
 
       <div className="field">
         <label>

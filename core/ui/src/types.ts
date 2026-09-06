@@ -131,6 +131,15 @@ export interface BindingSpec {
   value: string;
 }
 
+/** TABLE_GET_CELL/TABLE_SET_CELL only: which row to target. No "buffer" option — a
+ * table row index isn't something an earlier step would plausibly have captured. */
+export type RowBindingType = "literal" | "column";
+
+export interface RowBindingSpec {
+  type: RowBindingType;
+  value: string;
+}
+
 export type CaptureFrom = "actual_value" | "statusbar";
 
 export interface CaptureSpec {
@@ -143,12 +152,18 @@ export interface CaptureSpec {
  * name is still accepted by the backend via the free-text "other…" escape hatch. */
 export const PRIMARY_ACTIONS = ["SET", "SEND_VKEY", "PRESS", "SELECT"] as const;
 
+/** Actions that target one row of a table instead of a fixed component — the step's
+ * "attribute" must be a captured table-cell (an id ending "...[col,row]"); the row to
+ * actually hit is supplied separately per data row via row_binding. */
+export const TABLE_ACTIONS = ["TABLE_GET_CELL", "TABLE_SET_CELL"] as const;
+
 export interface StepSpec {
   module?: string | null;
   attribute?: string | null;
   component_id?: string | null;
   action: string;
   binding: BindingSpec;
+  row_binding: RowBindingSpec;
   optional: boolean;
   capture?: CaptureSpec | null;
 }
@@ -172,6 +187,8 @@ export interface TestStepOut {
   capture_buffer_key: string;
   capture_from: CaptureFrom;
   capture_pattern: string;
+  row_binding_type: RowBindingType;
+  row_binding_value: string;
 }
 
 export interface TestCaseSummary {

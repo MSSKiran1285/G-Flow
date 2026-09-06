@@ -170,6 +170,15 @@ class BindingSpec(BaseModel):
     value: str = ""
 
 
+class RowBindingSpec(BaseModel):
+    """TABLE_GET_CELL/TABLE_SET_CELL only: which row to target. No "buffer" option —
+    unlike a field's own value, a table row index isn't something an earlier step would
+    plausibly have captured."""
+
+    type: Literal["literal", "column"] = "literal"
+    value: str = ""
+
+
 class CaptureSpec(BaseModel):
     buffer: str
     from_: Literal["actual_value", "statusbar"] = Field("actual_value", alias="from")
@@ -190,6 +199,7 @@ class StepSpec(BaseModel):
     component_id: str | None = None
     action: str
     binding: BindingSpec = BindingSpec()
+    row_binding: RowBindingSpec = RowBindingSpec()
     optional: bool = False
     capture: CaptureSpec | None = None
 
@@ -221,6 +231,8 @@ class TestStepOut(BaseModel):
     capture_buffer_key: str
     capture_from: str
     capture_pattern: str
+    row_binding_type: str
+    row_binding_value: str
 
 
 class TestCaseSummary(BaseModel):

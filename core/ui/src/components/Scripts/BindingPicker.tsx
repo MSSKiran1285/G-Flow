@@ -1,4 +1,4 @@
-import type { BindingSpec, BindingType } from "../../types";
+import type { BindingType } from "../../types";
 
 const LABELS: Record<BindingType, string> = {
   literal: "Fixed value",
@@ -14,12 +14,22 @@ const PLACEHOLDERS: Record<BindingType, string> = {
 
 /** Simplified ValuePicker equivalent: one colored source tag beside one text input
  * whose meaning changes with the binding type — there's no per-module declared param
- * schema here (unlike G-Stride's reference), so this stays deliberately simple. */
-export function BindingPicker({ value, onChange }: { value: BindingSpec; onChange: (v: BindingSpec) => void }) {
+ * schema here (unlike G-Stride's reference), so this stays deliberately simple.
+ * `types` narrows which binding types are offered (e.g. row binding has no "buffer") —
+ * generic over T so a narrower spec, like RowBindingSpec, stays type-safe end to end. */
+export function BindingPicker<T extends BindingType = BindingType>({
+  value,
+  onChange,
+  types,
+}: {
+  value: { type: T; value: string };
+  onChange: (v: { type: T; value: string }) => void;
+  types: readonly T[];
+}) {
   return (
     <div>
       <div className="radio-row" role="radiogroup" aria-label="Binding type">
-        {(Object.keys(LABELS) as BindingType[]).map((type) => (
+        {types.map((type) => (
           <label key={type}>
             <input
               type="radio"

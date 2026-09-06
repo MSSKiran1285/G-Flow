@@ -87,3 +87,31 @@ def test_step_needs_either_raw_component_id_or_module_and_attribute(client):
     bad["steps"][0] = {"action": "SET", "binding": {"type": "literal", "value": "x"}}
     r = c.post("/api/test-cases", json=bad)
     assert r.status_code == 422
+
+
+def test_row_binding_round_trips_for_a_table_step(client):
+    c, _agent = client
+    spec = _spec()
+    spec["steps"].append({
+        "module": "VA01_InitialScreen", "attribute": "item_qty",
+        "action": "TABLE_SET_CELL", "binding": {"type": "column", "value": "quantity"},
+        "row_binding": {"type": "column", "value": "item_row"},
+    })
+
+    r = c.post("/api/test-cases", json=spec)
+    assert r.status_code == 200
+
+    detail = c.get("/api/test-cases/VA01_CreateOrder").json()
+    table_step = next(s for s in detail["steps"] if s["action_mode"] == "TABLE_SET_CELL")
+    assert table_step["row_binding_type"] == "column"
+    assert table_step["row_binding_value"] == "item_row"
+
+
+def test_row_binding_defaults_to_literal_zero_when_omitted(client):
+    c, _agent = client
+    r = c.post("/api/test-cases", json=_spec())
+    assert r.status_code == 200
+
+    detail = c.get("/api/test-cases/VA01_CreateOrder").json()
+    assert all(s["row_binding_type"] == "literal" for s in detail["steps"])
+    assert all(s["row_binding_value"] == "" for s in detail["steps"])

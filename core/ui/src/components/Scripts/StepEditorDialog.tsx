@@ -9,6 +9,7 @@ const BLANK_STEP: StepSpec = {
   component_id: null,
   action: "SET",
   binding: { type: "literal", value: "" },
+  row_binding: { type: "literal", value: "" },
   optional: false,
   capture: null,
 };

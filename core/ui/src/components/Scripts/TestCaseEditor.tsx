@@ -26,6 +26,7 @@ function stepFromOut(detail: TestCaseDetail): KeyedStep[] {
       component_id: s.raw_component_id || null,
       action: s.action_mode,
       binding: { type: s.binding_type, value: s.binding_value },
+      row_binding: { type: s.row_binding_type, value: s.row_binding_value },
       optional: s.optional,
       capture: s.capture_buffer_key
         ? { buffer: s.capture_buffer_key, from: s.capture_from, pattern: s.capture_pattern || null }

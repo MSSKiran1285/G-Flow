@@ -37,6 +37,7 @@ def _to_raw_spec(spec: TestCaseSpec) -> dict:
             "component_id": step.component_id or "",
             "action": step.action,
             "bind": f"{step.binding.type}:{step.binding.value}",
+            "row_bind": f"{step.row_binding.type}:{step.row_binding.value}",
             "optional": step.optional,
         }
         if step.capture:
@@ -66,6 +67,7 @@ def get_test_case(name: str, session_factory: sessionmaker[Session] = Depends(ge
                     action_mode=s.action_mode, binding_type=s.binding_type, binding_value=s.binding_value,
                     optional=s.optional, capture_buffer_key=s.capture_buffer_key,
                     capture_from=s.capture_from, capture_pattern=s.capture_pattern,
+                    row_binding_type=s.row_binding_type, row_binding_value=s.row_binding_value,
                 )
                 for s in test_case.steps
             ],

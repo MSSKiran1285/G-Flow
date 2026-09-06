@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from smt.adapter.generated import uiadapter_pb2 as pb
-from smt.engine.executor import define_test_case, run_chain, run_test_case
+from smt.engine.executor import _parse_table_cell_id, define_test_case, run_chain, run_test_case
 from smt.repository.db import init_db, make_engine, make_session_factory
 from smt.repository.models import Module, ModuleAttribute
 from tests.support.fake_agent import FakeAgent
@@ -219,6 +219,73 @@ def test_run_chain_shares_a_buffer_across_test_cases(session_factory, chain_setu
     assert [r.success for r in row] == [True, True]
     assert row[1].buffer == {"order_number": "1976", "delivery_number": "80001234"}
     assert ("wnd[0]/usr/ctxtVBAK-VKORG", "1976") in agent.sets  # DeliveryCase bound the captured order number
+
+
+def test_parse_table_cell_id_splits_table_and_column():
+    table_id, column = _parse_table_cell_id(
+        "wnd[0]/usr/tblSAPMV45ATC_TC_ITEM_OVERVIEW/ctxtRV45A-MABNR[1,3]"
+    )
+    assert table_id == "wnd[0]/usr/tblSAPMV45ATC_TC_ITEM_OVERVIEW"
+    assert column == "1"
+
+
+def test_parse_table_cell_id_rejects_a_non_table_component_id():
+    with pytest.raises(ValueError, match="captured table-cell attribute"):
+        _parse_table_cell_id("wnd[0]/usr/ctxtVBAK-AUART")
+
+
+@pytest.fixture
+def table_row_yaml(tmp_path: Path, session_factory) -> Path:
+    with session_factory() as db:
+        module = db.query(Module).filter_by(name="VA01_InitialScreen").one()
+        module.attributes.append(ModuleAttribute(
+            semantic_name="item_qty",
+            component_id="wnd[0]/usr/tblSAPMV45ATC_TC_ITEM_OVERVIEW/ctxtRV45A-KWMENG[3,0]",
+            sap_type="GuiCTextField",
+        ))
+        db.commit()
+
+    path = tmp_path / "va01_item.yaml"
+    path.write_text(
+        """
+name: VA01_SetItemQuantity
+steps:
+  - module: VA01_InitialScreen
+    attribute: item_qty
+    action: TABLE_SET_CELL
+    bind: "column:quantity"
+    row_bind: "column:item_row"
+""",
+        encoding="utf-8",
+    )
+    return path
+
+
+def test_table_set_cell_targets_the_table_with_a_data_driven_row(session_factory, table_row_yaml, tmp_path):
+    define_test_case(session_factory, table_row_yaml)
+    sheet = tmp_path / "items.csv"
+    sheet.write_text("quantity,item_row\n5,0\n12,1\n", encoding="utf-8")
+    agent = FakeAgent()
+
+    results = run_test_case(agent, session_factory, "VA01_SetItemQuantity", sheet, connection_id="conn1")
+
+    assert [r.success for r in results] == [True, True]
+    assert agent.table_calls == [
+        ("wnd[0]/usr/tblSAPMV45ATC_TC_ITEM_OVERVIEW", 0, "3", "TABLE_SET_CELL"),
+        ("wnd[0]/usr/tblSAPMV45ATC_TC_ITEM_OVERVIEW", 1, "3", "TABLE_SET_CELL"),
+    ]
+
+
+def test_table_row_binding_reports_a_clear_error_for_a_non_numeric_row(session_factory, table_row_yaml, tmp_path):
+    define_test_case(session_factory, table_row_yaml)
+    sheet = tmp_path / "items.csv"
+    sheet.write_text("quantity,item_row\n5,not-a-number\n", encoding="utf-8")
+    agent = FakeAgent()
+
+    results = run_test_case(agent, session_factory, "VA01_SetItemQuantity", sheet, connection_id="conn1")
+
+    assert results[0].success is False
+    assert "numeric table row" in results[0].message
 
 
 def test_run_chain_stops_a_row_at_the_first_failing_test_case(session_factory, chain_setup):

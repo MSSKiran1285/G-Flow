@@ -13,6 +13,7 @@ document at a time.
 from __future__ import annotations
 
 import csv
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -57,6 +58,7 @@ def define_test_case_from_spec(session_factory: sessionmaker[Session], spec: dic
 
         for order, step in enumerate(spec["steps"]):
             binding_type, _, binding_value = step.get("bind", "literal:").partition(":")
+            row_binding_type, _, row_binding_value = step.get("row_bind", "literal:").partition(":")
             capture = step.get("capture") or {}
             db.add(TestStep(
                 test_case=test_case,
@@ -71,6 +73,8 @@ def define_test_case_from_spec(session_factory: sessionmaker[Session], spec: dic
                 capture_buffer_key=capture.get("buffer", ""),
                 capture_from="statusbar" if capture.get("pattern") else "actual_value",
                 capture_pattern=capture.get("pattern", ""),
+                row_binding_type=row_binding_type or "literal",
+                row_binding_value=row_binding_value,
             ))
 
         db.commit()
@@ -91,13 +95,41 @@ def _resolve_component_id(db: Session, step: TestStep) -> str:
     return attribute.component_id
 
 
-def _build_params(action_mode: str, value: str) -> pb.ActionParams:
+TABLE_OPS = {"TABLE_GET_CELL", "TABLE_SET_CELL"}
+
+# A classic GuiTableControl cell's own component_id ends "...[col,row]" (e.g.
+# "wnd[0]/usr/tblSAPMV45ATC_TC_ITEM_OVERVIEW/ctxtRV45A-MABNR[1,3]" — column 1, row 3;
+# confirmed live on VA01's item overview table). The table control itself is the parent
+# path up to that last segment — same split ComponentHitTester.FindCaptionById (C# side)
+# uses to find a sibling label.
+_TABLE_CELL_ID = re.compile(r"^(?P<table_id>.+)/[^/\[]+\[(?P<col>\d+),\d+\]$")
+
+
+def _parse_table_cell_id(component_id: str) -> tuple[str, str]:
+    """Splits a captured table-cell attribute's id into (table's own component_id,
+    column index) — what TABLE_GET_CELL/TABLE_SET_CELL need as their target + column_id,
+    instead of the cell's own id, which always addresses whatever row was on screen at
+    capture time."""
+    match = _TABLE_CELL_ID.match(component_id)
+    if not match:
+        raise ValueError(
+            f"TABLE_GET_CELL/TABLE_SET_CELL step must reference a captured table-cell "
+            f"attribute (a component_id ending '...[col,row]'), got {component_id!r}"
+        )
+    return match.group("table_id"), match.group("col")
+
+
+def _build_params(action_mode: str, value: str, row: int | None = None, column_id: str = "") -> pb.ActionParams:
     if action_mode == "SET":
         return pb.ActionParams(text_value=value)
     if action_mode == "SEND_VKEY":
         return pb.ActionParams(vkey=value)
     if action_mode == "SELECT":
         return pb.ActionParams(key_value=value)
+    if action_mode == "TABLE_SET_CELL":
+        return pb.ActionParams(row=row, column_id=column_id, text_value=value)
+    if action_mode == "TABLE_GET_CELL":
+        return pb.ActionParams(row=row, column_id=column_id)
     return pb.ActionParams()
 
 
@@ -112,6 +144,17 @@ def _resolve_binding(step: TestStep, row: dict[str, str], buffer: dict[str, str]
             )
         return buffer[step.binding_value]
     return step.binding_value
+
+
+def _resolve_row_index(step: TestStep, row: dict[str, str], buffer: dict[str, str]) -> int:
+    raw = row.get(step.row_binding_value, "") if step.row_binding_type == "column" else step.row_binding_value
+    try:
+        return int(raw)
+    except ValueError:
+        raise ValueError(
+            f"step {step.sequence_order} needs a numeric table row, got {raw!r} "
+            f"from row binding {step.row_binding_type}:{step.row_binding_value!r}"
+        ) from None
 
 
 @dataclass
@@ -138,17 +181,23 @@ def _run_one_row(
     message = ""
 
     for step, component_id in resolved:
+        target_id = component_id
+        table_row: int | None = None
+        table_column_id = ""
         try:
             value = _resolve_binding(step, row, buffer)
+            if step.action_mode in TABLE_OPS:
+                target_id, table_column_id = _parse_table_cell_id(component_id)
+                table_row = _resolve_row_index(step, row, buffer)
         except ValueError as exc:
             failed_at, message = step.sequence_order, str(exc)
             break
 
         result = agent.execute_action(pb.ActionRequest(
             session_id=handle.session_id,
-            component_id=component_id,
+            component_id=target_id,
             op=getattr(pb, step.action_mode),
-            params=_build_params(step.action_mode, value),
+            params=_build_params(step.action_mode, value, table_row, table_column_id),
         ))
         if not result.success and not step.optional:
             failed_at = step.sequence_order

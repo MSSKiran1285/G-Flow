@@ -119,4 +119,14 @@ class TestStep(Base):
     capture_from: Mapped[str] = mapped_column(String(20), default="actual_value")
     capture_pattern: Mapped[str] = mapped_column(String(100), default="")
 
+    # TABLE_GET_CELL/TABLE_SET_CELL only: which row of the table to hit. A captured
+    # table-cell attribute's component_id always encodes the one row that happened to be
+    # on screen at capture time (e.g. "...MABNR[1,3]" — column 1, row 3) — resolving the
+    # step's actual target table and column index from that same id (see
+    # executor._parse_table_cell_id) leaves only the row still needing to vary per data
+    # row/line item, which is what this pair drives, exactly mirroring binding_type/
+    # binding_value's literal/column split but for the row instead of the cell's value.
+    row_binding_type: Mapped[str] = mapped_column(String(10), default="literal")
+    row_binding_value: Mapped[str] = mapped_column(String(300), default="")
+
     test_case: Mapped[TestCase] = relationship(back_populates="steps")

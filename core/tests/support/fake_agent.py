@@ -49,6 +49,7 @@ class FakeAgent:
         self.picked_components = list(picked_components) if picked_components else []
         self.last_picker_call: FakePickerCall | None = None
         self.sets: list[tuple[str, str]] = []
+        self.table_calls: list[tuple[str, int, str, str]] = []  # (component_id, row, column_id, op_name)
         self.sessions_opened = 0
         self.sessions_closed = 0
 
@@ -81,4 +82,8 @@ class FakeAgent:
             result = pb.ActionResult(success=True)
             result.statusbar_deltas.add(type="S", text=text)
             return result
+        if request.op in (pb.TABLE_SET_CELL, pb.TABLE_GET_CELL):
+            op_name = "TABLE_SET_CELL" if request.op == pb.TABLE_SET_CELL else "TABLE_GET_CELL"
+            self.table_calls.append((request.component_id, request.params.row, request.params.column_id, op_name))
+            return pb.ActionResult(success=True, actual_value=request.params.text_value)
         return pb.ActionResult(success=True)
