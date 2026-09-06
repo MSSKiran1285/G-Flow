@@ -13,6 +13,10 @@ export interface ConnectionsResponse {
   error: string | null;
 }
 
+/** "input" (a script SETs this) | "output" (this attribute's action is expected to
+ * produce a capturable result, e.g. pressing Save then parsing the statusbar). */
+export type AttributeDirection = "input" | "output";
+
 export interface ModuleAttributeOut {
   id: string;
   semantic_name: string;
@@ -23,6 +27,7 @@ export interface ModuleAttributeOut {
   caption: string;
   window_title: string;
   supported_action_modes: string[];
+  direction: AttributeDirection;
 }
 
 export interface ModuleSummary {
@@ -32,6 +37,7 @@ export interface ModuleSummary {
   screen_number: string;
   scanned_at: string;
   attribute_count: number;
+  folder: string;
 }
 
 export interface ModuleDetail extends ModuleSummary {
@@ -92,6 +98,7 @@ export interface SelectedAttribute {
   caption?: string;
   window_title?: string;
   supported_action_modes?: string[];
+  direction?: AttributeDirection;
 }
 
 export interface SaveModuleRequest {
@@ -100,6 +107,7 @@ export interface SaveModuleRequest {
   root_id?: string;
   screen_number?: string;
   attributes: SelectedAttribute[];
+  folder?: string;
 }
 
 export interface StartCaptureRequest {
@@ -156,6 +164,11 @@ export const PRIMARY_ACTIONS = ["SET", "SEND_VKEY", "PRESS", "SELECT"] as const;
  * "attribute" must be a captured table-cell (an id ending "...[col,row]"); the row to
  * actually hit is supplied separately per data row via row_binding. */
 export const TABLE_ACTIONS = ["TABLE_GET_CELL", "TABLE_SET_CELL"] as const;
+
+/** Actions whose ActionParams actually carry binding.value through to the agent (see
+ * executor._build_params) — every other action (PRESS, TABLE_GET_CELL, READ, ...)
+ * silently ignores it, so the UI shouldn't imply an input is in play for those. */
+export const BINDING_CONSUMING_ACTIONS = ["SET", "SEND_VKEY", "SELECT", "TABLE_SET_CELL"] as const;
 
 export interface StepSpec {
   module?: string | null;

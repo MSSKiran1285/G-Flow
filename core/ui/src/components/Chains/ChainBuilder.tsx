@@ -2,6 +2,7 @@ import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api, ApiError } from "../../api";
 import type { RowResultOut, TestCaseSummary } from "../../types";
+import { type BufferFlow, blankRow, bufferFlowOf, dataColumnsOf } from "../../utils";
 import { DataGridEditor, type GridRows } from "../Data/DataGridEditor";
 import { RunResultsPanel } from "../Runs/RunResultsPanel";
 
@@ -9,6 +10,7 @@ interface Stage {
   key: string;
   testCaseName: string;
   rows: GridRows;
+  bufferFlow: BufferFlow;
 }
 
 let nextKey = 0;
@@ -29,10 +31,26 @@ export function ChainBuilder() {
   }, []);
 
   const addStage = () => {
-    setStages((prev) => [...prev, { key: newKey(), testCaseName: "", rows: [] }]);
+    setStages((prev) => [...prev, { key: newKey(), testCaseName: "", rows: [], bufferFlow: { consumes: [], produces: [] } }]);
   };
 
   const removeStage = (key: string) => setStages((prev) => prev.filter((s) => s.key !== key));
+
+  const selectScript = async (key: string, testCaseName: string) => {
+    setStages((prev) => prev.map((s) => (s.key === key ? { ...s, testCaseName } : s)));
+    if (!testCaseName) return;
+    try {
+      const detail = await api.getTestCase(testCaseName);
+      const columns = dataColumnsOf(detail);
+      const bufferFlow = bufferFlowOf(detail);
+      setStages((prev) =>
+        prev.map((s) => (s.key === key ? { ...s, rows: columns.length ? [blankRow(columns)] : [], bufferFlow } : s))
+      );
+    } catch {
+      // script has no known data columns (or fetch failed) — leave the grid empty,
+      // the tester can still add columns by hand
+    }
+  };
 
   const move = (index: number, delta: number) => {
     setStages((prev) => {
@@ -58,7 +76,22 @@ export function ChainBuilder() {
     }
   };
 
-  const canRun = stages.length > 0 && stages.every((s) => s.testCaseName && s.rows.length > 0);
+  // Every stage runs the same row_index in lockstep (see run_chain_with_rows) — a
+  // mismatched row count between stages is always a real authoring mistake, not
+  // something the backend can sensibly guess how to reconcile, so it's worth
+  // catching here rather than only as a run-time ValueError after clicking Run.
+  const rowCountMismatch = stages.length > 1 && new Set(stages.map((s) => s.rows.length)).size > 1;
+  const canRun = stages.length > 0 && !rowCountMismatch && stages.every((s) => s.testCaseName && s.rows.length > 0);
+
+  /** Buffers produced by every stage strictly before `index` — what's actually
+   * available for that stage to consume, given chain stages run in listed order. */
+  const producedBefore = (index: number): Set<string> => {
+    const produced = new Set<string>();
+    for (let i = 0; i < index; i++) {
+      for (const key of stages[i].bufferFlow.produces) produced.add(key);
+    }
+    return produced;
+  };
 
   return (
     <div className="panel">
@@ -68,6 +101,13 @@ export function ChainBuilder() {
       </div>
       <div className="panel-body">
         {error && <div className="error-banner">{error}</div>}
+        {rowCountMismatch && (
+          <div className="error-banner">
+            Stages have different row counts ({stages.map((s, i) => `Stage ${i + 1}: ${s.rows.length}`).join(", ")}) — every
+            stage runs the same row index together, so they all need the same number of rows. Add or remove rows until
+            they match.
+          </div>
+        )}
 
         {stages.map((stage, index) => (
           <div key={stage.key} className="panel" style={{ marginBottom: 16 }}>
@@ -90,9 +130,7 @@ export function ChainBuilder() {
                 <label>Script</label>
                 <select
                   value={stage.testCaseName}
-                  onChange={(e) =>
-                    setStages((prev) => prev.map((s) => (s.key === stage.key ? { ...s, testCaseName: e.target.value } : s)))
-                  }
+                  onChange={(e) => selectScript(stage.key, e.target.value)}
                 >
                   <option value="" disabled>
                     choose a script…
@@ -104,6 +142,39 @@ export function ChainBuilder() {
                   ))}
                 </select>
               </div>
+              {(stage.bufferFlow.consumes.length > 0 || stage.bufferFlow.produces.length > 0) && (
+                <div className="field">
+                  <label>Buffer data flow</label>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                    {stage.bufferFlow.consumes.map((key) => {
+                      const available = producedBefore(index).has(key);
+                      return (
+                        <span
+                          key={`consumes-${key}`}
+                          className={`chip ${available ? "chip-buffer" : "status-fail"}`}
+                          title={
+                            available
+                              ? `Filled in automatically from an earlier stage's captured "${key}" — no data column needed`
+                              : `No earlier stage produces "${key}" yet — this step will fail at run time. Add a stage before this one whose script captures it, or reorder stages.`
+                          }
+                        >
+                          uses buffer: {key}
+                          {!available && " ⚠"}
+                        </span>
+                      );
+                    })}
+                    {stage.bufferFlow.produces.map((key) => (
+                      <span
+                        key={`produces-${key}`}
+                        className="chip chip-column"
+                        title={`Captured by this script — available to every stage after this one as buffer:${key}`}
+                      >
+                        produces buffer: {key}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
               <DataGridEditor
                 rows={stage.rows}
                 onChange={(rows) => setStages((prev) => prev.map((s) => (s.key === stage.key ? { ...s, rows } : s)))}

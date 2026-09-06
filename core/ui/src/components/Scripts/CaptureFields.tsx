@@ -5,9 +5,14 @@ import type { CaptureFrom, CaptureSpec } from "../../types";
 export function CaptureFields({
   value,
   onChange,
+  defaultOpen = false,
 }: {
   value: CaptureSpec | null;
   onChange: (v: CaptureSpec | null) => void;
+  /** Expand the section even before a capture is configured — used for an "output"
+   * attribute (e.g. a Save button), where capturing a result is the expected next
+   * step rather than an edge case worth hiding behind a details toggle. */
+  defaultOpen?: boolean;
 }) {
   const [patterns, setPatterns] = useState<string[]>([]);
   const enabled = value !== null;
@@ -22,7 +27,7 @@ export function CaptureFields({
   };
 
   return (
-    <details className="details-advanced" open={enabled}>
+    <details className="details-advanced" open={enabled || defaultOpen}>
       <summary>Capture (optional) {enabled && `· buffer "${value.buffer || "…"}"`}</summary>
       <div style={{ marginTop: 12 }}>
         <label>

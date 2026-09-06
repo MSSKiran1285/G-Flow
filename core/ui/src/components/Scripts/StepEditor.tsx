@@ -20,6 +20,11 @@ export function StepEditor({ step, onChange }: { step: StepSpec; onChange: (s: S
   const [attributes, setAttributes] = useState<ModuleAttributeOut[]>([]);
   const [useRawId, setUseRawId] = useState(Boolean(step.component_id));
 
+  const selectedAttribute = !useRawId ? attributes.find((a) => a.semantic_name === step.attribute) : undefined;
+  // A raw component id, or an attribute not yet loaded, is treated as "input" — the
+  // common case — rather than guessing at a direction with no data behind it.
+  const direction = selectedAttribute?.direction ?? "input";
+
   useEffect(() => {
     api.listModules().then(setModules).catch(() => setModules([]));
   }, []);
@@ -116,14 +121,27 @@ export function StepEditor({ step, onChange }: { step: StepSpec; onChange: (s: S
         </select>
       </div>
 
-      <div className="field">
-        <label>Binding</label>
-        <BindingPicker
-          value={step.binding}
-          onChange={(binding) => onChange({ ...step, binding })}
-          types={["literal", "column", "buffer"]}
-        />
-      </div>
+      {direction === "output" ? (
+        <details className="details-advanced">
+          <summary>Value binding (rarely needed for an output attribute)</summary>
+          <div style={{ marginTop: 12 }}>
+            <BindingPicker
+              value={step.binding}
+              onChange={(binding) => onChange({ ...step, binding })}
+              types={["literal", "column", "buffer"]}
+            />
+          </div>
+        </details>
+      ) : (
+        <div className="field">
+          <label>Binding</label>
+          <BindingPicker
+            value={step.binding}
+            onChange={(binding) => onChange({ ...step, binding })}
+            types={["literal", "column", "buffer"]}
+          />
+        </div>
+      )}
 
       {(TABLE_ACTIONS as readonly string[]).includes(step.action) && (
         <div className="field">
@@ -148,7 +166,11 @@ export function StepEditor({ step, onChange }: { step: StepSpec; onChange: (s: S
         </label>
       </div>
 
-      <CaptureFields value={step.capture ?? null} onChange={(capture) => onChange({ ...step, capture })} />
+      <CaptureFields
+        value={step.capture ?? null}
+        onChange={(capture) => onChange({ ...step, capture })}
+        defaultOpen={direction === "output"}
+      />
     </div>
   );
 }

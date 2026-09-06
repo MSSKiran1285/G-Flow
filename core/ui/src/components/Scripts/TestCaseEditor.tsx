@@ -1,7 +1,8 @@
 import { Copy, Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { api, ApiError } from "../../api";
-import type { RowResultOut, StepSpec, TestCaseDetail } from "../../types";
+import { BINDING_CONSUMING_ACTIONS, type RowResultOut, type StepSpec, type TestCaseDetail } from "../../types";
+import { blankRow, dataColumnsOf } from "../../utils";
 import { DataGridEditor, type GridRows } from "../Data/DataGridEditor";
 import { RunResultsPanel } from "../Runs/RunResultsPanel";
 import { StepEditorDialog } from "./StepEditorDialog";
@@ -64,6 +65,8 @@ export function TestCaseEditor({ name, onClose }: { name: string | null; onClose
       setCaseName(detail.name);
       setDescription(detail.description);
       setSteps(stepFromOut(detail));
+      const columns = dataColumnsOf(detail);
+      if (columns.length) setGridRows([blankRow(columns)]);
     }).catch(() => undefined);
   }, [name]);
 
@@ -181,7 +184,7 @@ export function TestCaseEditor({ name, onClose }: { name: string | null; onClose
                 <th>#</th>
                 <th>Target</th>
                 <th>Action</th>
-                <th>Binding</th>
+                <th>Data</th>
               </tr>
             </thead>
             <tbody>
@@ -234,16 +237,31 @@ export function TestCaseEditor({ name, onClose }: { name: string | null; onClose
                   <td style={{ font: "var(--text-code)" }}>{summarizeTarget(step)}</td>
                   <td>{step.action}</td>
                   <td>
-                    <span className={`chip chip-${step.binding.type}`}>
-                      {step.binding.type}
-                      {step.binding.value ? `: ${step.binding.value}` : ""}
-                    </span>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-start" }}>
+                      {(BINDING_CONSUMING_ACTIONS as readonly string[]).includes(step.action) && (
+                        <span className={`chip chip-${step.binding.type}`}>
+                          Input: {step.binding.type}
+                          {step.binding.value ? `:${step.binding.value}` : ""}
+                        </span>
+                      )}
+                      {step.capture && (
+                        <span className="chip chip-buffer">
+                          Output: buffer:{step.capture.buffer || "…"}
+                          {step.capture.from === "statusbar" && step.capture.pattern
+                            ? ` (${step.capture.pattern})`
+                            : ""}
+                        </span>
+                      )}
+                      {!(BINDING_CONSUMING_ACTIONS as readonly string[]).includes(step.action) && !step.capture && (
+                        <span className="breadcrumb">—</span>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
               {steps.length === 0 && (
                 <tr>
-                  <td className="empty-state">No steps yet — add one above.</td>
+                  <td className="empty-state" colSpan={6}>No steps yet — add one above.</td>
                 </tr>
               )}
             </tbody>
