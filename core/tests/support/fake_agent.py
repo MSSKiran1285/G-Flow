@@ -52,9 +52,14 @@ class FakeAgent:
         self.table_calls: list[tuple[str, int, str, str]] = []  # (component_id, row, column_id, op_name)
         self.sessions_opened = 0
         self.sessions_closed = 0
+        self.screenshots_captured = 0
 
     def list_connections(self) -> pb.ConnectionList:
         return self.connections
+
+    def capture_screenshot(self, request):
+        self.screenshots_captured += 1
+        return pb.ImageBlob(data=b"fake-png-bytes", format="png", width=10, height=10)
 
     def open_session(self, request):
         self.sessions_opened += 1

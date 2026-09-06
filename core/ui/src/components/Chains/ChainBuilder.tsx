@@ -24,6 +24,7 @@ export function ChainBuilder() {
   const [stages, setStages] = useState<Stage[]>([]);
   const [results, setResults] = useState<RowResultOut[][]>([]);
   const [running, setRunning] = useState(false);
+  const [generatingEvidence, setGeneratingEvidence] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -73,6 +74,18 @@ export function ChainBuilder() {
       setError(e instanceof ApiError ? e.message : "Chain run failed");
     } finally {
       setRunning(false);
+    }
+  };
+
+  const generateEvidence = async () => {
+    setGeneratingEvidence(true);
+    setError(null);
+    try {
+      await api.generateChainEvidence(stages.map((s) => ({ test_case_name: s.testCaseName, row: s.rows[0] ?? {} })));
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Evidence generation failed");
+    } finally {
+      setGeneratingEvidence(false);
     }
   };
 
@@ -189,6 +202,14 @@ export function ChainBuilder() {
           </button>
           <button className="btn btn-primary" disabled={!canRun || running} onClick={run}>
             {running ? "Running…" : "Run chain"}
+          </button>
+          <button
+            className="btn"
+            disabled={!canRun || generatingEvidence}
+            onClick={generateEvidence}
+            title="Re-runs the chain once (using each stage's first data row), timing every step and capturing a screenshot of each, then downloads a PDF evidence document"
+          >
+            {generatingEvidence ? "Generating evidence…" : "Generate Evidence"}
           </button>
         </div>
 

@@ -291,3 +291,23 @@ class RunChainRequest(BaseModel):
 
 class RunChainResponse(BaseModel):
     results: list[list[RowResultOut]]
+
+
+# --- evidence (on-demand, single-row, screenshot-instrumented run) ---
+
+class EvidenceTestCaseRequest(BaseModel):
+    test_case_name: str
+    row: dict[str, str] = {}
+    connection_id: str | None = None
+    capture_screenshots: bool = True
+
+
+class EvidenceChainStage(BaseModel):
+    test_case_name: str
+    row: dict[str, str] = {}
+
+
+class EvidenceChainRequest(BaseModel):
+    stages: list[EvidenceChainStage]
+    connection_id: str | None = None
+    capture_screenshots: bool = True

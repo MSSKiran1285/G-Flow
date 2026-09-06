@@ -55,6 +55,7 @@ export function TestCaseEditor({ name, onClose }: { name: string | null; onClose
   const [gridRows, setGridRows] = useState<GridRows>([]);
   const [results, setResults] = useState<RowResultOut[]>([]);
   const [running, setRunning] = useState(false);
+  const [generatingEvidence, setGeneratingEvidence] = useState(false);
 
   const dragIndex = useRef<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
@@ -105,6 +106,18 @@ export function TestCaseEditor({ name, onClose }: { name: string | null; onClose
       setError(e instanceof ApiError ? e.message : "Run failed");
     } finally {
       setRunning(false);
+    }
+  };
+
+  const generateEvidence = async () => {
+    setGeneratingEvidence(true);
+    setError(null);
+    try {
+      await api.generateTestCaseEvidence(caseName, gridRows[0] ?? {});
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Evidence generation failed");
+    } finally {
+      setGeneratingEvidence(false);
     }
   };
 
@@ -273,6 +286,14 @@ export function TestCaseEditor({ name, onClose }: { name: string | null; onClose
         <div className="toolbar" style={{ border: "none", paddingLeft: 0 }}>
           <button className="btn btn-primary" disabled={!caseName || running || gridRows.length === 0} onClick={run}>
             {running ? "Running…" : "Run script"}
+          </button>
+          <button
+            className="btn"
+            disabled={!caseName || generatingEvidence || gridRows.length === 0}
+            onClick={generateEvidence}
+            title="Re-runs the script once (using the first data row), timing every step and capturing a screenshot of each, then downloads a PDF evidence document"
+          >
+            {generatingEvidence ? "Generating evidence…" : "Generate Evidence"}
           </button>
         </div>
         <RunResultsPanel results={results} />

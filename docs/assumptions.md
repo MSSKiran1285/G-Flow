@@ -708,3 +708,38 @@ the script-builder UI:
   not "today" — confirmed by direct choice not to re-run `MMPV` this round, to keep
   the test data static rather than re-opening a moving target. Revisit if enough
   real time passes that even July drops out of the open window.
+
+## Evidence capture: a real screenshot-accuracy bug, found and fixed live (2026-09-06)
+
+Building an on-demand PDF evidence feature (`smt/engine/evidence.py`,
+`smt/reporting/evidence_pdf.py` — one PDF per run, with real per-step timing, a
+highlighted screenshot after each step, plan/data hashes, and a raw verbatim log,
+modeled on G-Stride's own evidence documents) surfaced a genuine, previously-latent
+bug in `ScreenshotService.Capture`:
+
+- **`Graphics.CopyFromScreen` is a raw screen-coordinate pixel grab — it has no
+  concept of "the SAP window," only "whatever is visually on top at these
+  coordinates."** First live run's screenshots all showed an unrelated corporate
+  Zscaler auth prompt instead of SAP, because that window was covering the same
+  screen region. Root cause, confirmed via a raw `EnumWindows` probe: **the entire
+  SAP session (and SAP Logon itself) was minimized** — Windows parks a minimized
+  window at `(-32000,-32000)` with a tiny placeholder rect, and the screenshot
+  code had no logic to detect or fix that, so it silently photographed whatever
+  real window happened to occupy the visible screen region instead.
+- This is the same class of issue as the already-documented "window position
+  drift" gotcha below, just never actually automated — that section describes the
+  fix in prose (`SetForegroundWindow`+`SetWindowPos`) but no code implementing it
+  existed anywhere in the agent before now.
+- **Fix**: new `Native/WindowFocus.cs` — re-enumerates top-level windows by class
+  (`SAP_FRONTEND_SESSION`) on every call (not a cached handle), calls
+  `ShowWindow(SW_RESTORE)` if `IsIconic`, then `SetForegroundWindow`, then a short
+  fixed wait for the compositor to catch up. Wired into
+  `ScreenshotService.Capture` before it reads `ScreenLeft`/`ScreenTop`/`Width`/
+  `Height`. Live-verified: before the fix, a screenshot was 160×28px (the
+  minimized-window placeholder size) showing the wrong window entirely; after the
+  fix, 1382×736px showing the real, correct SAP screen with the expected field
+  highlighted in red.
+- Full O2C chain evidence generation subsequently proven live end to end: order
+  1993 → delivery 80001144 → PGI → billing 90001008, 21-page PDF, every screenshot
+  correct, every step's real duration recorded, buffers correctly threaded through
+  the traceability matrix.

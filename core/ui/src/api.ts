@@ -41,6 +41,36 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+async function requestBlob(path: string, body: unknown): Promise<Blob> {
+  const res = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    let detail = res.statusText;
+    try {
+      const errBody = await res.json();
+      if (errBody?.detail) detail = typeof errBody.detail === "string" ? errBody.detail : JSON.stringify(errBody.detail);
+    } catch {
+      // response wasn't JSON — keep statusText
+    }
+    throw new ApiError(detail);
+  }
+  return res.blob();
+}
+
+/** Triggers a normal browser file save — this is G-Flow's own app running in the
+ * tester's own browser, not a sandboxed published page, so a plain <a download> works. */
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export const api = {
   listConnections: () => request<ConnectionsResponse>("/api/connections"),
   listMessagePatterns: () => request<string[]>("/api/message-patterns"),
@@ -89,6 +119,20 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ stages, connection_id: connectionId ?? null }),
     }),
+
+  generateTestCaseEvidence: async (testCaseName: string, row: Record<string, string>, connectionId?: string) => {
+    const blob = await requestBlob("/api/runs/test-case/evidence", {
+      test_case_name: testCaseName, row, connection_id: connectionId ?? null,
+    });
+    downloadBlob(blob, `${testCaseName}_evidence.pdf`);
+  },
+  generateChainEvidence: async (
+    stages: { test_case_name: string; row: Record<string, string> }[],
+    connectionId?: string,
+  ) => {
+    const blob = await requestBlob("/api/runs/chain/evidence", { stages, connection_id: connectionId ?? null });
+    downloadBlob(blob, "chain_evidence.pdf");
+  },
 };
 
 export { ApiError };
